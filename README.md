@@ -9,31 +9,32 @@ This is just one of many projects creating 'artificial life', wherefrom emeregen
 Requirements
 ------------
 	
-	* pygame - http://pygame.org/
-	* numpy - http://www.numpy.org/
-	* cerebro - https://github.com/jmread/cerebro
+* pygame - http://pygame.org/
+* numpy - http://www.numpy.org/
+* cerebro - https://github.com/jmread/cerebro
 
 Getting Started
 ---------------
 
-    If you have all the requirements, then run
-    ```
-	$ ./ALife.py
-    ```
+If you have all the requirements, then run
+
+```
+$ ./ALife.py
+```
 
 Documentation
 -------------
 
 No interaction is required. But the following keys are available:
 
-	* `d` -	Cycle debug level 
-	* `r` -	New 'resource'
-	* `h` -	New 'herbivore'
-	* `p` -	New 'predator'
-	* `k` -	New 'rock' (under mouse pointer)
-	* `i` -	Print out info
-	* `s` -	Saving current objects to files
-	* `l` -	Load objects from files
+* `d` -	Cycle debug level 
+* `r` -	New 'resource'
+* `h` -	New 'herbivore'
+* `p` -	New 'predator'
+* `k` -	New 'rock' (under mouse pointer)
+* `i` -	Print out info
+* `s` -	Saving current objects to files
+* `l` -	Load objects from files
 
 
 Related Projects:
@@ -41,7 +42,7 @@ Related Projects:
 
 I've run across some related projects with some nice demos on YouTube:
 
-	* https://www.youtube.com/watch?v=2kupe2ZKK58
-	* https://www.youtube.com/watch?list=PLC9058E743A6155C1&v=1Jou4ggCFKQ
-	* https://sites.google.com/site/scriptbotsevo/
+* https://www.youtube.com/watch?v=2kupe2ZKK58
+* https://www.youtube.com/watch?list=PLC9058E743A6155C1&v=1Jou4ggCFKQ
+* https://sites.google.com/site/scriptbotsevo/
 
