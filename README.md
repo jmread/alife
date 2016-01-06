@@ -35,6 +35,9 @@ No interaction is required. But the following keys are available:
 * `i` -	Print out info
 * `s` -	Saving current objects to files
 * `l` -	Load objects from files
+* `up` - More energy input (more resources)
+* `down` - Less energy input (more resources)
+* `<kbd>shift</kbd>` 
 
 
 Related Projects:
