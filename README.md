@@ -27,17 +27,16 @@ Documentation
 
 No interaction is required. But the following keys are available:
 
-* `d` -	Cycle debug level 
-* `r` -	New 'resource'
-* `h` -	New 'herbivore'
-* `p` -	New 'predator'
-* `k` -	New 'rock' (under mouse pointer)
-* `i` -	Print out info
-* `s` -	Saving current objects to files
-* `l` -	Load objects from files
-* `up` - More energy input (more resources)
-* `down` - Less energy input (more resources)
-* `<kbd>shift</kbd>` 
+* <kbd>d</kbd> -	Cycle debug level 
+* <kbd>r</kbd> -	New 'resource'
+* <kbd>h</kbd> -	New 'herbivore'
+* <kbd>p</kbd> -	New 'predator'
+* <kbd>k</kbd> -	New 'rock' (under mouse pointer)
+* <kbd>i</kbd> -	Print out info
+* <kbd>s</kbd> -	Saving current objects to files
+* <kbd>l</kbd> -	Load objects from files
+* <kbd>&uarr;</kbd> - More energy input (more resources)
+* <kbd>&darr;</kbd> - Less energy input (more resources)
 
 
 Related Projects:
