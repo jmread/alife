@@ -5,13 +5,14 @@ This is just one of many projects creating 'artificial life', wherefrom emeregen
 
 ![Screenshot](screenshot.png "Screenshot")
 
+The creatures are rather simple. Green dots are plant food, blue dots are herbivores and red dots are omnivores (but they don't process plant food as well as the herbivores). Input is of the form of two antennae plus the body as a third sensor, each of which has three binary range detectors (for RGB), forming a simple eye, plus a hunger sensor, for a total of 10 inputs. Outputs is simply a velocity. Speed in indicated by the length of the tail. A health bar and a 'happiness' bar are displayed (depending on the debug level).
 
 Requirements
 ------------
 	
-* pygame - http://pygame.org/
-* numpy - http://www.numpy.org/
-* cerebro - https://github.com/jmread/cerebro
+* pygame - http://pygame.org/ - provides the graphics
+* numpy - http://www.numpy.org/ - provides a nice vector representation
+* cerebro - https://github.com/jmread/cerebro - provides the 'brain' with implementations of recurrent neural networks and reinforcement learning
 
 Getting Started
 ---------------
@@ -22,10 +23,7 @@ If you have all the requirements, then run
 $ ./ALife.py
 ```
 
-Documentation
--------------
-
-No interaction is required. But the following keys are available:
+and just watch. No interaction is required. But the following keys are available:
 
 * <kbd>d</kbd> -	Cycle debug level 
 * <kbd>r</kbd> -	New 'resource'
