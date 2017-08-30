@@ -3,7 +3,15 @@
 import pygame
 
 import joblib, glob, time, datetime
+from graphics import *
 from objects import *
+
+# Game
+FPS = 60 # 100                              # <-- higher = less CPU
+GRID_SIZE = 64                              # tile size
+VISION = GRID_SIZE*0.5                      # vision in the murky waters
+MAX_GRID_DETECTION = 100                    # maximum number of objects that can be detected at once
+RESOURCE_LIMIT = 1000
 
 class DrawGroup(pygame.sprite.Group):
     def draw(self, surface):
@@ -14,20 +22,26 @@ def load_map(s):
     ''' load a map from a text file '''
     MAP = zeros((10,10),dtype=int)
     if s is not None:
-        MAP = genfromtxt(s, delimiter = 1, dtype=int)
-    return MAP
+        MAP = genfromtxt(s, delimiter = 1, dtype=str)
+    return MAP[1:-1,1:-1]
 
-def random_position(SCREEN):
+def random_position(world):
     ''' random positions somewhere on the screen '''
-    return random.rand(2) * SCREEN
+    # TODO: do this more sensibly
+    k = random.choice(world.terrain.shape[0])
+    j = random.choice(world.terrain.shape[1])
+    while world.terrain[k,j] > 0:
+        k = random.choice(world.terrain.shape[0])
+        j = random.choice(world.terrain.shape[1])
+    return world.grid2pos((j,k)) + random.randn(2) * GRID_SIZE/3.
 
 class World:
 
-    def __init__(self,fname=None,init_sprites=0):
+    def __init__(self,fname=None,init_sprites=2):
 
-        self.terrain = load_map(fname)
-        self.N_ROWS = self.terrain.shape[0]
-        self.N_COLS = self.terrain.shape[1]
+        map_codes = load_map(fname)                  # load the map
+        self.N_ROWS = map_codes.shape[0]
+        self.N_COLS = map_codes.shape[1]
         self.WIDTH = self.N_COLS * GRID_SIZE
         self.HEIGHT = self.N_ROWS * GRID_SIZE
         SCREEN = array([self.WIDTH, self.HEIGHT])
@@ -37,7 +51,7 @@ class World:
 
         ## GRID REGISTER and GRID COUNT 
         self.register = [[[None for l in xrange(MAX_GRID_DETECTION)] for k in xrange(self.N_ROWS)] for j in xrange(self.N_COLS)]
-        self.regcount = zeros(self.terrain.shape,int) 
+        self.regcount = zeros(map_codes.shape,int) 
 
         ## INIT ##
         pygame.display.set_caption("ALife")
@@ -45,13 +59,8 @@ class World:
         pygame.mouse.set_visible(1)
 
         ## BACKGROUND ##
-        background = pygame.Surface(self.screen.get_size())
-        background.fill([0, 0, 0])                  # fill with black
-        for j in range(self.N_COLS):
-            for k in range(self.N_ROWS):
-                if self.terrain[k,j] > 0:
-                    background.fill(tid2rgb[self.terrain[k,j]], rect=(j*GRID_SIZE,k*GRID_SIZE,GRID_SIZE,GRID_SIZE))            # rock
-        background = background.convert()           # can speed up when we have an 'intense' background
+        from graphics import build_map_png as build_map
+        background, self.terrain = build_map(self.screen.get_size(),self.N_COLS,self.N_ROWS,GRID_SIZE,map_codes)
 
         ## DISPLAY THE BACKGROUND ##
         self.screen.blit(background, [0, 0])
@@ -71,16 +80,20 @@ class World:
         
         FACTOR = init_sprites
         for i in range(self.N_ROWS*((FACTOR/2)**2)):
-            Thing(random_position(SCREEN), ID=ID_PLANT)
+            Thing(random_position(self), mass=100+random.rand()*1000, ID=ID_ROCK)
+        for i in range(self.N_ROWS*((FACTOR/2)**2)):
+            Thing(random_position(self), mass=100+random.rand()*1000, ID=ID_PLANT)
         for i in range(self.N_ROWS*FACTOR/4*2):
-            Creature((random_position(SCREEN)), cal = 75, lim = 150)
+            Creature((random_position(self)), cal = 75, lim = 150)
         for i in range(self.N_ROWS*FACTOR/6*2):
-            Creature((random_position(SCREEN)),cal = 200, lim = 400, ID = ID_PREDATOR, food_ID = ID_ANIMAL)
+            Creature((random_position(self)),cal = 200, lim = 400, ID = ID_PREDATOR, food_ID = ID_ANIMAL)
 
         self.allSprites.clear(self.screen, background)
 
         ## MAIN LOOP ##
-        DEBUG = 2
+        sel_obj = None 
+        GRAPHICS_ON = True
+        GRID_ON = False
         while True:
             self.clock.tick(FPS)
 
@@ -88,50 +101,56 @@ class World:
                 if event.type == QUIT:
                     return
                 if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_g:
+                        GRAPHICS_ON = (GRAPHICS_ON != True)
                     if event.key == pygame.K_d:
-                        DEBUG = (DEBUG + 1) % 4
-                        print "DEBUG = ", DEBUG
-                    elif event.key == pygame.K_s:
-                        print "SAVING ..."
-                        st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M')
-                        print st
-                        counter = 1
-                        for s in self.creatures:
-                            joblib.dump( s,  "./dat/dna/C"+str(counter)+"_"+str(st)+"_G"+str(s.generation)+".dat")
-                            counter = counter + 1
-                        print "SAVED."
-                    elif event.key == pygame.K_l:
-                        print "LOADING ..."
-                        import glob
-                        for filename in glob.glob('./dat/dna/*.dat'):
-                            temp = joblib.load(filename)
-                            print("Load gen %d Creature ..." % temp.generation)
-                            Creature(random_position(SCREEN),generation = temp.generation, cal = temp.calories, lim = temp.cal_limit, ID = temp.ID, food_ID = temp.food_ID)
-                            temp = None
-                        print "LOADED."
+                        GRID_ON = (GRID_ON != True)
+
+#                    elif event.key == pygame.K_s:
+#                        print "SAVING ..."
+#                        st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M')
+#                        print st
+#                        counter = 1
+#                        for s in self.creatures:
+#                            joblib.dump( s,  "./dat/dna/C"+str(counter)+"_"+str(st)+"_G"+str(s.generation)+".dat")
+#                            counter = counter + 1
+#                        print "SAVED."
+#                    elif event.key == pygame.K_l:
+#                        print "LOADING ..."
+#                        import glob
+#                        for filename in glob.glob('./dat/dna/*.dat'):
+#                            temp = joblib.load(filename)
+#                            print("Load gen %d Creature ..." % temp.generation)
+#                            Creature(random_position(self),generation = temp.generation, cal = temp.calories, lim = temp.rep_limit, ID = temp.ID, food_ID = temp.food_ID)
+#                            temp = None
+#                        print "LOADED."
                     elif event.key == pygame.K_DOWN:
                         prosperity = prosperity + 1
-                        print "LOWER ENERGY INFLUX", prosperity
+                        print "LOWER ENERGY INFLUX (new plant every %d ticks)" % prosperity
                     elif event.key == pygame.K_UP:
                         prosperity = prosperity - 1
-                        print "HIGHER ENERGY INFLUX", prosperity
+                        print "HIGHER ENERGY INFLUX (new plant every %d ticks)" % prosperity
                     elif event.key == pygame.K_k:
                         print "NEW ROCK"
                         Thing(array(pygame.mouse.get_pos()),mass=500, ID=ID_ROCK)
                     elif event.key == pygame.K_r:
                         print "NEW RESOURCE"
-                        Thing(array(pygame.mouse.get_pos()), ID=ID_PLANT)
+                        Thing(array(pygame.mouse.get_pos()), mass=100+random.rand()*1000, ID=ID_PLANT)
                     elif event.key == pygame.K_h:
                         print "NEW CREATURE"
                         Creature(array(pygame.mouse.get_pos()))
                     elif event.key == pygame.K_p:
                         print "NEW PREDATOR"
                         Creature(array(pygame.mouse.get_pos()),cal = 200, lim = 400, ID = ID_PREDATOR, food_ID = ID_ANIMAL)
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    print("Select")
+                    a_sth,sel_obj,square = self.check_collisions_p(pygame.mouse.get_pos(), 20., None, rext=0.)
 
             # Make sure there is a constant flow of resources/energy into the system
             count = count + 1
-            if count > prosperity and len(self.resources) < 100:
-                Thing(random_position(SCREEN), ID=ID_PLANT)
+            if count > prosperity and len(self.resources) < RESOURCE_LIMIT:
+                p = random_position(self)
+                Thing(p, mass=100+random.rand()*1000, ID=ID_PLANT)
                 count = 0
 
             # Reset reg-counts
@@ -144,43 +163,53 @@ class World:
             for r in self.allSprites:
                 r.live(self)
 
-            self.allSprites.update()
-
-            if DEBUG > 0:
+            if GRAPHICS_ON:
 
                 # Draw
+                self.allSprites.update()
                 self.screen.blit(background, [0, 0])
-                # GRID STOP
-                rects = self.allSprites.draw(self.screen)
 
-            if DEBUG >= 1:
+            if GRAPHICS_ON:
 
                 for r in self.creatures:
-                    # FEELERS
-                    pygame.draw.line(self.screen, rgb2color(r.f_a[IDX_PROBE1],r.color), r.pos, r.pos+r.pa1, 3)
-                    pygame.draw.line(self.screen, rgb2color(r.f_a[IDX_PROBE2],r.color), r.pos, r.pos+r.pa2, 3)
-                    pygame.draw.circle(self.screen, rgb2color(r.f_a[IDX_PROBE1],COLOR_BLACK), (int((r.pos+r.pa1)[0]),int((r.pos+r.pa1)[1])), int(r.radius*3.), 1)
-                    pygame.draw.circle(self.screen, rgb2color(r.f_a[IDX_PROBE2],COLOR_BLACK), (int((r.pos+r.pa2)[0]),int((r.pos+r.pa2)[1])), int(r.radius*3.), 1)
-                    # TAIL
-                    pygame.draw.line(self.screen, r.color, r.pos, r.pos+(r.velocity * -20.), 1)
+                    # Feelers
+                    pygame.draw.line(self.screen, rgb2color(r.f_a[IDX_PROBE1],id2rgb[r.ID]), r.pos, r.pos+r.pa1, 1)
+                    pygame.draw.line(self.screen, rgb2color(r.f_a[IDX_PROBE2],id2rgb[r.ID]), r.pos, r.pos+r.pa2, 1)
+                    # Tail / Wings
+                    if norm(r.velocity) > FLIGHT_SPEED:
+                        # (if in flight)
+                        u = unitv(r.velocity)
+                        wing1 = rotate(u * r.radius*2,+pi/2.8)
+                        wing2 = rotate(u * r.radius*2,-pi/2.8)
+                        #pygame.draw.line(self.screen, id2rgb[r.ID], r.pos, r.pos+(r.velocity * -5.), 2)
+                        pygame.draw.line(self.screen, id2rgb[r.ID], r.pos, r.pos-wing1, 6)
+                        pygame.draw.line(self.screen, id2rgb[r.ID], r.pos, r.pos-wing2, 6)
 
-                    # BODY
-                    pygame.draw.circle(self.screen, rgb2color(r.f_a[IDX_COLIDE],r.color), (int(r.pos[0]),int(r.pos[1])), int(r.radius), 1)
-                    pygame.draw.circle(self.screen, rgb2color(r.f_a[IDX_COLIDE],COLOR_BLACK), (int(r.pos[0]),int(r.pos[1])), int(r.radius*4.), 1)
+                # Selecting an object (for debugging)
+                if sel_obj is not None and sel_obj.ID > 3:
+                    #pygame.draw.circle(self.screen, COLOR_WHITE, (int(sel_obj.pos[0]),int(sel_obj.pos[1])), int(sel_obj.radius*2), 3)
+                    myfont = pygame.font.SysFont("monospace", 16)
+                    s = str(sel_obj.b.__class__.__name__ + "; G" + str(sel_obj.generation) )
+                    label = myfont.render(s, 1, COLOR_WHITE)
+                    self.screen.blit(label, sel_obj.pos - [3,0])
+                    #s = "====================================\n"  
+                    #    "Generation     "+str(sel_obj.generation) + '\n' + 
+                    #    "Brain          "+str(s.b.nodes) + '\n' + 
+                    #    "Observations   "+str(sel_obj.f_a) + '\n' + 
+                    #    "Outputs        "+str(sel_obj.velocity) + '\n' + 
+                    #    "Calories       "+str(sel_obj.calories) + '\n' + 
+                    #    "===================================="
+                    # Body
+                    pygame.draw.circle(self.screen, rgb2color(sel_obj.f_a[IDX_COLIDE],id2rgb[sel_obj.ID]), (int(sel_obj.pos[0]),int(sel_obj.pos[1])), int(sel_obj.radius + 3), 4)
+                    # Rangers
+                    pygame.draw.circle(self.screen, rgb2color(sel_obj.f_a[IDX_PROBE1],COLOR_BLACK), (int((sel_obj.pos+sel_obj.pa1)[0]),int((sel_obj.pos+sel_obj.pa1)[1])), int(sel_obj.radius*3.), 2)
+                    pygame.draw.circle(self.screen, rgb2color(sel_obj.f_a[IDX_PROBE2],COLOR_BLACK), (int((sel_obj.pos+sel_obj.pa2)[0]),int((sel_obj.pos+sel_obj.pa2)[1])), int(sel_obj.radius*3.), 2)
+                    pygame.draw.circle(self.screen, rgb2color(sel_obj.f_a[IDX_COLIDE],COLOR_BLACK), (int(sel_obj.pos[0]),int(sel_obj.pos[1])), int(sel_obj.radius*4.), 3)
+                    # Health/Calories
+                    pygame.draw.line(self.screen, COLOR_WHITE, sel_obj.pos-20, [sel_obj.pos[0]+20,sel_obj.pos[1]-20], 1)
+                    pygame.draw.line(self.screen, COLOR_WHITE, sel_obj.pos-20, [sel_obj.pos[0]-20+(sel_obj.f_a[IDX_CALORIES]*40),sel_obj.pos[1]-20], 5)
 
-            if DEBUG >= 2:
-
-                # STATUS BARS
-                for r in self.creatures:
-                    # HEALTH/CALORIES
-                    pygame.draw.line(self.screen, COLOR_WHITE, r.pos-10, [r.pos[0]+10,r.pos[1]-10], 1)
-                    pygame.draw.line(self.screen, COLOR_WHITE, r.pos-10, [r.pos[0]-10+(r.f_a[IDX_CALORIES]*20),r.pos[1]-10], 4)
-                    # TEXT
-                    myfont = pygame.font.SysFont("monospace", 10)
-                    label = myfont.render(str(r.generation), 1, COLOR_WHITE)
-                    self.screen.blit(label, r.pos - [3,-6])
-
-            if DEBUG >= 3:
+            if GRID_ON:
 
                 # GRID ON
                 for l in range(0,self.N_ROWS*GRID_SIZE,GRID_SIZE):
@@ -188,23 +217,13 @@ class World:
                 for l in range(0,self.N_COLS*GRID_SIZE,GRID_SIZE):
                     pygame.draw.line(self.screen, COLOR_LIME, [l, 0], [l,SCREEN[1]], 1)
 
-                # Selecting an object (for debugging)
-                a_sth,sel_obj,square = self.check_collisions_p(pygame.mouse.get_pos(), 2., None, rext=0.)
-                if sel_obj is not None and sel_obj.ID > 2:
-                    pygame.draw.circle(self.screen, COLOR_WHITE, (int(sel_obj.pos[0]),int(sel_obj.pos[1])), int(sel_obj.radius*2), 1)
-                    print "===================================="
-                    print "Generation     ", sel_obj.generation
-                    #print "Brain          "#, s.b.nodes
-                    print "Observations   ", sel_obj.f_a
-                    print "Outputs        ", sel_obj.velocity
-                    print "Calories       ", sel_obj.calories
-
             #self.resources.update()                 # <-- doing this, don't need allSprites or DrawGroup
             #rects = self.resources.draw(self.screen)
             #self.resources.draw(self.screen)        # <-- doing this, don't need allSprites or DrawGroup
             #self.creatures.draw(self.screen)
 
-            if DEBUG > 0:
+            if GRAPHICS_ON:
+                rects = self.allSprites.draw(self.screen)
                 pygame.display.update(rects)
                 pygame.display.flip()
                 pygame.time.delay(FPS)
@@ -218,10 +237,22 @@ class World:
         return array([px,py])
 
     def pos2grid(self,p):
-        ''' position to grid reference '''
+        ''' position to grid reference TODO: WRAP? '''
         rx = max(min(int(p[0]/GRID_SIZE),self.N_COLS-1),0)
         ry = max(min(int(p[1]/GRID_SIZE),self.N_ROWS-1),0)
         return rx,ry
+
+    def point_on_the_wall_closest_to_me(self,p,(x,y),(tx,ty)):
+        ''' I am at point p in square x,y, return the closest point of the tile with centre (tx,ty) '''
+        tile_wall = self.grid2pos((tx,ty))
+        if tx == x:
+            # (tile is to the right or left)
+            tile_wall[1] = p[1]
+        else:
+            # (tile is above or below)
+            tile_wall = self.grid2pos((tx,ty))
+            tile_wall[0] = p[0]
+        return tile_wall
 
     def add_to_reg(self, sprite):
         '''
@@ -243,9 +274,9 @@ class World:
 
             Check for collisions of point 's_point' with radius 's_radius'
             -- excluding object 'excl' from search.
+            -- If radius 'rext' is specified, then consider this a collision.
 
-            If other radius 'rext' is specified, then consider this a collision, and 
-            return (A,B,C) where
+            Return (A,B,C) where
                 A : the color of the object we collided with
                 B : the object itself that we collided with (None if terrain)
                 C : the type of terrain we collided with (None if object)
@@ -267,50 +298,45 @@ class World:
             a = array([1.,1.,1.,])
             return a, None, self.grid2pos((x,y))
 
-        # else check with objects  @TODO WRAPPING MIGHT ACTUALLY BE EASIER?
+        # Check collisions with objects in current and neighbouring tiles  @TODO WRAPPING MIGHT ACTUALLY BE EASIER?
         for i in [-1,0,+1]:
-            p_x = min(max(x+i,0),self.N_COLS-1)
+            p_x = (x + i) % self.N_COLS
+            # p_x = min(max(x+i,0),self.N_COLS-1)
             for j in [-1,0,+1]:
-                p_y = min(max(y+j,0),self.N_ROWS-1)
+                p_y = (y + j) % self.N_ROWS
+                # p_y = min(max(y+j,0),self.N_ROWS-1)
 
-                lim = self.regcount[p_x,p_y]
+                # This tile is terrain -- check for proximity with it!
+                if i != 0 and j != 0 and self.terrain[p_y,p_x] > 0:
+                    wall_point = self.point_on_the_wall_closest_to_me(s_point,(x,y),(p_x,p_y))
+                    d = proximity(s_point, wall_point) - (s_radius + (GRID_SIZE * 0.5)) # (wall 'radius' is half a tile)
+                    if d < 0.:
+                        # In visual range, so calulate how much of the vision blocked (as done below) ...
+                        a = a + id2rgb[ID_ROCK] * -d / s_radius
+
+                # The neighbouring tile is empty -- check for collisions with other objects!
                 things = self.register[p_x][p_y]
-                for i in range(lim):
+                for i in range(self.regcount[p_x,p_y]):
+                    # Is this object something other than myself? 
                     if things[i] != excl:
-                        # if not itself, take the distance ...
+                        # How far are we from it ?
                         d = proximity(s_point,things[i].pos) - (s_radius + things[i].radius)
                         if d < -s_radius:
-                            # actually touching, ... so return only for this object
+                            # We are touching! Return this object.
                             return id2rgb[things[i].ID], things[i], None
                         elif d < 0.:
-                            # in range, so calulate how much of the vision blocked
-                            # (should be a function of radius and inverse distance) and add it to the input spectrum
-                            a = a + id2rgb[things[i].ID] * -d / s_radius * 0.8
-                            if rext > 0. and (proximity(s_point,things[i].pos) - (rext + things[i].radius)) < 0:
+                            # In visual range, so calulate how much of the vision blocked 
+                            # (should be a function of radius [i.e., weight] and inverse distance [to target]) 
+                            # ... and add it to the input spectrum
+                            a = a + id2rgb[things[i].ID] * -d / s_radius
+                            if  rext > 0. and (proximity(s_point,things[i].pos) - (rext + things[i].radius)) < 0:
                                 obj = things[i]
 
-        # Should never be 1, even if really close -- only 1.0 if actually touching!
-        # ... if we got this far, we didn't collide totally
+        # We should only reach 1.0 if actually touching, even if visual field is overwhelmed!
+        # (if we got this far, we didn't collide totally)
         # TODO should be relative, sigmoid/logarithmic ?
-        a[0] = clip(a[0],0.,0.9)
-        a[1] = clip(a[1],0.,0.9)
-        a[2] = clip(a[2],0.,0.9)
+        a = clip(a,0.0,0.9)
+        #a = clip(0.95/(1. + exp(-a-1.)),0.0,0.95)
+        #print("a",a)
         return a, obj, None
 
-#    def check_collisions(self, s, x, y):
-#        # NOTE: NOT ACTUALLY USED ATM
-#        '''
-#            Check for collisions of sprite 's' in grid 'x,y' with all sprites.
-#            -------------------------------------------------------------------------------
-#        '''
-#
-#        for i in [-1,0,+1]:
-#            p_x = min(max(x+i,0),self.N_COLS-1)
-#            for j in [-1,0,+1]:
-#                p_y = min(max(y+j,0),self.N_ROWS-1)
-#                lim = self.regcount[p_x,p_y]
-#                things = self.register[p_x][p_y]
-#                for i in range(lim):
-#                    if things[i] != s and proximity(s.pos,things[i].pos) <= (s.radius+things[i].radius):
-#                        return things[i]
-#        return None

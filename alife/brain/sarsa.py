@@ -1,6 +1,11 @@
 from numpy import *
 
 class SARSA():
+    '''
+        SARSA
+        -----
+        Implementation of SARSA learning.
+    '''
 
     alpha = 0.1
     epsilon = 0.5
@@ -14,14 +19,13 @@ class SARSA():
         self.Q = random.rand(K,J) # genetically inherited
         self._s = 0
         self._a = 0
-
-    a2y = array([
-            [+0.0,0.01],
-            [+0.2,1.5],
-            [-0.2,1.5],
-            [+0.0,1.5]
-        ])
-
+        speed = random.rand()*6.
+        self.a2y = array([
+                [+0.0,0.01],
+                [+0.2,speed],
+                [-0.2,speed],
+                [+0.0,speed]
+            ])
 
     def act(self,x,r,done=False):
         '''
@@ -29,7 +33,7 @@ class SARSA():
             ----
         '''
 
-        # discretize
+        # Discretize state (binarize, and then return as integer)
         s = int(((x > 0.2)*(2**arange(x.size,dtype=uint64))).sum())
 
         # GET STATE/ACTION
@@ -42,6 +46,7 @@ class SARSA():
             a = random.choice(2**self.L)
         else:
             a = argmax(self.Q[s,:])
+        # Decay randomness
         self.epsilon = self.epsilon * 0.99999
 
         # UPDATE MODEL
@@ -51,9 +56,15 @@ class SARSA():
         self._s = s
         self._a = a
 
-        # undiscretize
-        y = self.a2y[a] #unpackbits(uint8(a))[-self.L:] * array([0.1,2.1])
+        # Undiscretize action (using map)
+        y = self.a2y[a] 
         return y
+
+    def load(self,fname):
+        return ""
+
+    def save(self,fname):
+        return ""
 
     def copy_of(self):
         b = SARSA(self.D,self.L)
@@ -61,6 +72,14 @@ class SARSA():
         b.alpha = self.alpha + random.randn() * (b.alpha * 0.05)
         b.epsilon = self.epsilon + random.randn() * (b.epsilon * 0.05)
         b.gamma = self.gamma + random.randn() * (b.gamma * 0.05)
+        #b.a2y = self.a2y + random.randn(4,2) * array([
+        #    [0.00,0.0],
+        #    [0.01,0.1],
+        #    [0.01,0.1],
+        #    [0.00,0.1]
+        #])
+        #b.a2y = abs(self.a2y)
+
         return b
 
 
