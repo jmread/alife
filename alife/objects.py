@@ -29,7 +29,7 @@ observ_space = BugSpace(0.,1.,(N_INPUTS,))
 IDX_ANGLE = 0
 IDX_SPEED = 1
 N_OUTPUTS = 2
-action_space = BugSpace(array([-pi, -10]), array([pi,10]))
+action_space = BugSpace(array([-pi/4., -10.]), array([pi/4.,10.]))
 
 # Some constants
 TERRAIN_DAMAGE = 1.  # Added factor when hitting a wall or landing on water

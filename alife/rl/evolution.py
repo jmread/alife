@@ -52,6 +52,7 @@ class Evolver(Agent):
 
         # No learning, just a simple reflex.
         a = dot(x,self.W) + self.w
+        # TODO need to clip action range
         return a
 
     def spawn(self):

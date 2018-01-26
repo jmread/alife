@@ -8,7 +8,7 @@ class BugSpace():
         Like the Box space in aigym.
     """
 
-    def __init__(self, low, high, shape):
+    def __init__(self, low, high, shape=None):
         """
             Create a space as vector shape.
 
