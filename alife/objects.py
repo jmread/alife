@@ -1,42 +1,52 @@
 import pygame
 from pygame.locals import *
 
+import pickle
+
 from utils import *
 from graphics import build_image_png as build_image, build_image_bank
-from brain.sarsa import SARSA# as brain
-from brain.coded import Coded#as brain
-from brain.evolu import Evolu#as brain
+from rl.spaces import BugSpace # the space of the environment (for the agent)
+from rl.agent import Agent 
 set_printoptions(precision=4)
 
-N_OUTPUTS = 2
-IDX_COLIDE = [0,1,2]
-IDX_PROBE1 = [3,4,5]
-IDX_PROBE2 = [6,7,8]
-N_LINPUTS = 9
-IDX_CALORIES = 9   # N.B. no need for this really (unless we embed the reward into the state space!)
-N_INPUTS = 10
-
-ID_NADA = 0
+# Types of Sprites/Things/Objects
+ID_VOID = 0
 ID_ROCK = 1
 ID_MISC = 2
 ID_PLANT = 3
 ID_ANIMAL = 4
 ID_PREDATOR = 5
-MAX_ID = 5
 
-TERRAIN_DAMAGE = 1.  # added factor when hitting a wall or landing on water
-BOUNCE_DAMAGE = 10.  # multiplied factor when hitting a friend
-FLIGHT_SPEED = 5.    # after this speed, a creature takes flight
+# Inputs (state space)
+IDX_COLIDE = [0,1,2]
+IDX_PROBE1 = [3,4,5]
+IDX_PROBE2 = [6,7,8]
+IDX_ENERGY = 9
+N_INPUTS = 10  
+observ_space = BugSpace(0.,1.,(N_INPUTS,))
+
+# Outputs (action space)
+IDX_ANGLE = 0
+IDX_SPEED = 1
+N_OUTPUTS = 2
+action_space = BugSpace(array([-pi, -10]), array([pi,10]))
+
+# Some constants
+TERRAIN_DAMAGE = 1.  # Added factor when hitting a wall or landing on water
+BOUNCE_DAMAGE = 10.  # Multiplied factor when hitting a friend
+FLIGHT_SPEED = 5.    # After this speed, a creature takes flight
+DIVIDE_LIMIT = 1.4   # Divide when at this proportion of energy
+
 
 class Thing(pygame.sprite.DirtySprite):
     '''
-        A Thing (either Rock, Plant, Animal, Predictor, ...)
+        A Thing (either Rock, Plant, Animal, Predator, ...)
     '''
     def __init__(self, pos, mass = 500, ID = ID_ROCK):
         pygame.sprite.Sprite.__init__(self, self.containers)
         self.ID = ID
         self.radius = 3 + int(math.sqrt(mass/math.pi))
-        self.calories = mass                                                     # ~ body mass
+        self.calories = mass # ~ body mass
         self.pos = pos
         self.dirty = True
         self.rect, self.image = build_image(self.pos,self.radius,self.ID)
@@ -75,7 +85,7 @@ class Thing(pygame.sprite.DirtySprite):
                 # overlap with terrain
                 self.kill()
                 self.dirty = False
-                print("A rock or something fell into the water")
+                #print("Something fell into the water and disappeared")
                 #TODO: SlideOff(self, terrain_centre, 5.)
             if collision_obj is not None:
                 if collision_obj.ID == ID_ROCK or collision_obj.ID == ID_PLANT:
@@ -112,24 +122,24 @@ class Thing(pygame.sprite.DirtySprite):
         self.remove()
         self = None
 
-def brain_loader(ID):
+def spawn_agent(ID, agent_def="alife.rl.evolution:Evolver"):
     ''' 
-        Brain Loader
-        ------------
-        Thus we can load different 'brains' randomly if we wish.
+        Spawn a new creature and give it a rl (agent).
+
+        Parameters
+        ----------
+        ID : int
+            the type of creature to create.
     '''
-    c = random.choice(3)
-    #c = 1
-    if c == 0:
-        return Coded(ID)
-    elif c == 1:
-        return SARSA(N_LINPUTS,N_OUTPUTS)
-    elif c == 2:
-        return Evolu(N_LINPUTS,N_OUTPUTS)
+    mod_str,cls_str = agent_def.split(":")
+    import importlib
+    Agent = getattr(importlib.import_module(mod_str), cls_str)
+    return Agent(observ_space, action_space)
+
 
 class Creature(Thing):
     '''
-        A Creature
+        A Creature: Something that moves (i.e., an agent).
     '''
 
     def __init__(self,pos,dna=None,generation=0, cal = 100.0, lim = 200, food_ID = ID_PLANT, ID = ID_ANIMAL):
@@ -143,10 +153,18 @@ class Creature(Thing):
         self.generation = generation
         self.velocity = random.rand((2))
         self.process_actions(y=random.rand(2)*0.2)
-        self.f_a = zeros(N_INPUTS, dtype=float)       
+        self.state = zeros(N_INPUTS, dtype=float)       
         self._calories = self.calories
-        # DNA
-        self.b = dna.copy_of() if dna is not None else brain_loader(self.ID)
+        # DNA (the agent)
+        if isinstance(dna, str):
+            self.b = spawn_agent(self.ID, dna)
+        elif isinstance(dna, Agent):
+            self.b = dna.spawn()
+        else:
+            self.b = spawn_agent(self.ID)
+
+    def __str__(self):
+        return ("Type %s; Gen. %d" % (str(self.b),self.generation))
 
     def move(self):
         ''' Move and Wrap '''
@@ -159,9 +177,9 @@ class Creature(Thing):
 
         # (TODO: we probably want to do a global collision detection in 'world' before each round)
 
-        self.f_a[IDX_COLIDE],collision_obj,terrain_centre = world.check_collisions_p(self.pos,self.radius*4.,self,rext=self.radius)
-        self.f_a[IDX_PROBE1],o1,t1 = world.check_collisions_p(self.pos+self.pa1,self.radius*3.,self)
-        self.f_a[IDX_PROBE2],o2,t2 = world.check_collisions_p(self.pos+self.pa2,self.radius*3.,self)
+        self.state[IDX_COLIDE],collision_obj,terrain_centre = world.check_collisions_p(self.pos,self.radius*4.,self,rext=self.radius)
+        self.state[IDX_PROBE1],o1,t1 = world.check_collisions_p(self.pos+self.pa1,self.radius*3.,self)
+        self.state[IDX_PROBE2],o2,t2 = world.check_collisions_p(self.pos+self.pa2,self.radius*3.,self)
 
         if norm(self.velocity) >= FLIGHT_SPEED:
             # We are flying, cannot hit anything
@@ -190,23 +208,22 @@ class Creature(Thing):
                 # I am the prey!
                 predator = being
                 prey = self
-            # FIGHT!
-            #print "Fight! Between creatures: prey ("+str(prey.f_a[IDX_CALORIES])+") vs predator ("+str(predator.f_a[IDX_CALORIES]) + ")"
+            #Fight between prey and predator
             speed_of_attack = norm(predator.velocity)
             if angle_of_attack(predator,prey) > pi/3.:
-                #print "\tAttacker has wrong angle of attack (%3.2f > %3.2f)!" % (angle_of_attack(predator,prey), pi/2.)
+                # Attacker has wrong angle of attack (%3.2f > %3.2f)!" % (angle_of_attack(predator,prey), pi/2.)
                 BounceOffFrom(predator,prey)
                 predator.calories = predator.calories - speed_of_attack * BOUNCE_DAMAGE   # Ouch!
                 prey.calories = prey.calories - speed_of_attack * BOUNCE_DAMAGE         # Ouch!
             else:
                 bite = speed_of_attack * random.rand() * 10.
-                #print "\tAttacker successful: *nom nom* (bites off %3.2f cal)." % bite
-                predator.calories = predator.calories + (bite * 5.) # <-- this * 5 breaks the laws of physics to help predators, or -- meat is easier to extract calories from than plant matter
+                # Attacker successful (bites off %3.2f cal). % bite
+                predator.calories = predator.calories + bite
                 prey.calories = prey.calories - bite
                 BounceOffFrom(predator,prey)
 
         else:
-            # The being is a comrade (TODO later: reproduction goes here, depending on angle of a approach/velocity, either mate or bounce off)
+            # The being is from the same species (TODO: add reproduction option here)
             self.calories = self.calories - norm(being.velocity) * BOUNCE_DAMAGE   # Ouch!
             being.calories = being.calories - norm(self.velocity) * BOUNCE_DAMAGE  # Ouch!
             BounceOffFrom(self,being)
@@ -218,7 +235,7 @@ class Creature(Thing):
 
         # Starve?
         if self.calories < 10:
-            #print "A sprite died of starvation"
+            # died of starvation
             Thing(self.pos + random.randn(2)*10., mass=20, ID=ID_PLANT)
             self.kill()
             return
@@ -228,47 +245,47 @@ class Creature(Thing):
         if colide != None:
             colide.hit_by(self)
 
-        # Normalize health level (TODO currently not used !)
-        self.f_a[IDX_CALORIES] = min((self.calories/self.rep_limit),1.)
+        # Normalize health level (if used in state space)
+        self.state[IDX_ENERGY] = min((self.calories/self.rep_limit),1.)
 
         # Reinforcement learning
-        x = self.f_a[0:N_LINPUTS]          # observation ~= state
-        r = self.calories - self._calories # reward
-        self._calories = self.calories
-        y = self.b.act(x,r)                # actions
+        x = self.state[0:N_INPUTS]           # observation 
+        r = self.calories - self._calories # reward = energy diff from last timestep
+        self._calories = self.calories     # (save the current energy)
+        y = self.b.act(x,r)                # call upon the agent to act
 
-        self.process_actions(y)
+        self.process_actions(y)            # ... and enact them.
 
         self.wrap(world)
 
     def process_actions(self,y):
         '''
-            Process Actions
-            ---------------
-            Using y[0] (angle) and y[1] (speed) component
+            Process Actions.
+
+            Using y[0] (angle) and y[1] (speed) component.
         '''
         # New velocity vector
-        speed = y[1]
-        angle = y[0]
+        angle = y[IDX_ANGLE]
+        speed = y[IDX_SPEED]
         if angle < -0.01 or angle > 0.01:
             self.velocity = rotate(self.velocity,angle)
         u = unitv(self.velocity)
         self.velocity = u * speed + (speed > 5.) * 3.
-        # Update antennae (note: could save some minor speed here by moving the self.radius * 3 inside of unitv)
-        self.pa1 = rotate(u * self.radius*3,0.3)
-        self.pa2 = rotate(u * self.radius*3,-0.3)
-        # Now move (which burns calories according to size and speed)
-        self.calories = self.calories - (1.+speed)**3 * (self.radius / 10000.0)
+        # Update antennae
+        self.pa1 = rotate(u * self.radius*3,+0.3) # antenna left pos
+        self.pa2 = rotate(u * self.radius*3,-0.3) # antenna right pos
+        # Now move (this burns energy according to size and speed)
+        self.calories = self.calories - (1.+abs(speed))**3 * (self.radius / 10000.0)
         self.move();
-        # Divide (if we are 1.4 times over the limit)
-        if self.calories > (self.rep_limit * 1.4):
+        # Divide (if we are DIVIDE_LIMIT times over the limit)
+        if self.calories > (self.rep_limit * DIVIDE_LIMIT):
             Creature(self.pos+u * -self.radius * 3., dna = self.b, generation = self.generation+1, cal = self.rep_limit * 0.2, lim = self.rep_limit, food_ID = self.food_ID, ID = self.ID)
             self.calories = self.rep_limit * 1.05
-            # we need to reset the gain so that also dividing loses calories it does not depress the creature (does not affect its internal reward system)
+            # Reproduction does not depress the creature (does not affect its reward signal)
             gain = self.calories - self._calories
             self._calories = self.calories - gain 
 
     def update(self):
 
-        ''' ... and draw '''
+        ''' Draw (simply extract the correct image for the given angle) '''
         self.image = self.images[angle_deg(self.velocity)]

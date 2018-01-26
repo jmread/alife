@@ -7,7 +7,7 @@ def proximity(p1, p2):
 
 def SlideApart(s,o):
     ''' object s slide away from object o '''
-    v_diff = s.pos - o.pos                # vector from one to the other
+    v_diff = s.pos - o.pos        # vector from one to the other
     d_now = norm(v_diff)          # distance from centres
     d_after = s.radius + o.radius # but they should be this far apart
     if d_after > d_now:
@@ -31,14 +31,14 @@ def Slide(s,p):
     s.move()
 
 def Reflect(s):
-    ''' reflect (when the other object doesn't move, like a wall or a heavy rock'''
+    ''' reflect (when the other object doesn't move, like a wall or a heavy rock '''
     s.velocity = -s.velocity
     s.move()
 
 def BounceOffFrom(s,e):
     ''' two objects bounds off each other '''
     # todo: the heavier one should bounce less
-    # todo use the new slide?
+    # todo slide?
     st = s.velocity
     et = e.velocity
     s.velocity - e.velocity

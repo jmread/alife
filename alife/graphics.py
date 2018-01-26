@@ -2,35 +2,26 @@ import pygame
 from random import choice as choice
 from numpy import *
 
-# Colours
-COLOR_WHITE  = 255, 255, 255
-COLOR_BLACK  = 0, 0, 0
-COLOR_RED    = 255, 0, 0
-COLOR_BLUE   = 0, 0, 255
-COLOR_CYAN   = 0, 255, 255
-COLOR_GREEN  = 0, 128, 0
-COLOR_LIME  = 0, 255, 0
-COLOR_YELLOW = 255, 255, 0
-COLOR_PINK   = 255, 0, 255
-COLOR_ORANGE = 255, 165, 0
-COLOR_GRAY   = 128, 128, 128
-COLOR_DARK   = 1, 1, 1
-COLOR_BROWN  = 250, 250, 20
+# PyGame colours
 COLOR_TRANSPARENT = (1,2,3)
+COLOR_WHITE  = (255, 255, 255)
+COLOR_BLACK  = (0, 0, 0)
 
-# Describes the colors of each sprite object
-# (now only used for antennae and things like that)
+# RGB intensities given a sprite ID
 id2rgb = array([
-    [0.,0.,0.],          # ID_NADA = 0        = COLOR_WHITE/255
-    [1.,1.,1.],          # ID_ROCK = 1        = etc.
-    [0.,0.,0.],          # ID_MISC  = 2
-    [0.,1.,0.],          # ID_PLANT = 3
-    [0.,0.,1.],          # ID_ANIMAL = 4
-    [1.,0.,0.],          # ID_PREDATOR = 5
+    [0.,0.,0.], # VOID     = 0  = BLACK
+    [1.,1.,1.], # ROCK     = 1  = WHITE
+    [0.,0.,0.], # MISC     = 2  = BLACK
+    [0.,1.,0.], # PLANT    = 3  = GREEN
+    [0.,0.,1.], # ANIMAL   = 4  = BLUE
+    [1.,0.,0.], # PREDATOR = 5  = RED
     ])
 
 def rgb2color(a, default=COLOR_BLACK):
-    ''' Convert a vector in [0,1] to a colour vector '''
+    ''' 
+        Convert RGB intensity to a colour
+        (and return the default colour if there is no intensity)
+    '''
     if sum(a) <= .0:
         return default
     return a * 255
@@ -39,7 +30,7 @@ def build_image_wireframe(pos,rad,ID):
     '''
         Build a wireframe image at pos, with radius rad, and ID.
     '''
-    color = id2rgb[ID]*255
+    color = rgbvec[ID]*255
     image = pygame.Surface((rad*2, rad*2))
     image.fill(COLOR_TRANSPARENT)
     image.set_colorkey(COLOR_TRANSPARENT)
@@ -101,7 +92,7 @@ terr = {
     }
 
 def get_tree(n):
-    ''' Load a resource '''
+    ''' Load a plant '''
     sheet = pygame.image.load('./img/trees_packed.png').convert_alpha()
     image = sheet.subsurface(trees[n])
     return image
@@ -129,7 +120,7 @@ def build_image_png(pos,rad,ID):
     image = pygame.transform.scale(image, (rad*2, rad*2))
 
     # Draw team colours
-    #color = id2rgb[ID]*255
+    #color = id2vec[ID]*255
     #pygame.draw.circle(image, color, (rad,rad), rad, 1 )
 
     rect=image.get_rect(center=pos)
@@ -138,8 +129,9 @@ def build_image_png(pos,rad,ID):
 def build_map_wireframe(size,N_COLS,N_ROWS,GRID_SIZE,terrain):
     '''
         Build a black map, with a different color for the terrain.
-        N.B.: this function is probably broken at the moment, but it's not used by default anyway.
+        N.B.: THIS FUNCTION IS PROBABLY BROKEN AT THE MOMENT, BUT IT'S NOT USED BY DEFAULT ANYWAY.
     '''
+    COLOR_BROWN  = (250, 250, 20)
     background = pygame.Surface(size)
     background.fill([0, 0, 0])                  # fill with black
     for j in range(N_COLS):
