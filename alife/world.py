@@ -157,7 +157,7 @@ class World:
             if step % prosperity == 0 and len(self.plants) < RESOURCE_LIMIT:
                 p = random_position(self)
                 Thing(p, mass=100+random.rand()*1000, ID=ID_PLANT)
-                print("Time step %d" % step)
+                print("Time step %d; %d creatures alive" % (step,len(self.creatures)))
 
             # Reset reg-counts
             self.regcount = zeros((self.N_COLS,self.N_ROWS),int) 
