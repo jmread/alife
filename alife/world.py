@@ -51,7 +51,7 @@ class World:
         self.HEIGHT = self.N_ROWS * GRID_SIZE
         SCREEN = array([self.WIDTH, self.HEIGHT])
 
-        count = 0
+        step = 0
         prosperity = 50
 
         ## GRID REGISTER and GRID COUNT 
@@ -153,11 +153,11 @@ class World:
                     a_sth,sel_obj,square = self.check_collisions_p(pygame.mouse.get_pos(), 20., None, rext=0.)
 
             # Make sure there is a constant flow of resources/energy into the system
-            count = count + 1
-            if count > prosperity and len(self.plants) < RESOURCE_LIMIT:
+            step = step + 1
+            if step % prosperity == 0 and len(self.plants) < RESOURCE_LIMIT:
                 p = random_position(self)
                 Thing(p, mass=100+random.rand()*1000, ID=ID_PLANT)
-                count = 0
+                print("Time step %d" % step)
 
             # Reset reg-counts
             self.regcount = zeros((self.N_COLS,self.N_ROWS),int) 
@@ -219,9 +219,9 @@ class World:
 
                 # GRID ON
                 for l in range(0,self.N_ROWS*GRID_SIZE,GRID_SIZE):
-                    pygame.draw.line(self.screen, COLOR_LIME, [0, l], [SCREEN[0],l], 1)
+                    pygame.draw.line(self.screen, COLOR_WHITE, [0, l], [SCREEN[0],l], 1)
                 for l in range(0,self.N_COLS*GRID_SIZE,GRID_SIZE):
-                    pygame.draw.line(self.screen, COLOR_LIME, [l, 0], [l,SCREEN[1]], 1)
+                    pygame.draw.line(self.screen, COLOR_WHITE, [l, 0], [l,SCREEN[1]], 1)
 
             #self.plants.update()                 # <-- doing this, don't need allSprites or DrawGroup
             #rects = self.plants.draw(self.screen)
