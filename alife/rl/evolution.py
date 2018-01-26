@@ -50,9 +50,11 @@ class Evolver(Agent):
                 (the action to take)
         """
 
-        # No learning, just a simple reflex.
+        # No learning, just a simple linear reflex.
         a = dot(x,self.W) + self.w
         # TODO need to clip action range
+        a[0] = clip(a[0], self.A.low[0], self.A.high[0])
+        a[1] = clip(a[1], self.A.low[1], self.A.high[1])
         return a
 
     def spawn(self):
