@@ -1,1 +1,1 @@
-alife.rl.sarsa:Sarsa
+alife.rl.evolution:Evolver
