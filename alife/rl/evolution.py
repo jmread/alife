@@ -1,5 +1,5 @@
 from numpy import *
-from agent import Agent
+from alife.rl.agent import Agent
 from copy import copy
 
 class Evolver(Agent):
