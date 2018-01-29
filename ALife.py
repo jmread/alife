@@ -2,7 +2,7 @@
 import sys
 sys.path.append("alife")
 
-map_file = "map_islands2.dat"
+map_file = "dat/maps/map_islands2.dat"
 if len(sys.argv) > 1:
     map_file = sys.argv[1]
 
