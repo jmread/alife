@@ -20,14 +20,19 @@ Herbivore and predator bugs are animate agents, where input is in the form of th
 
 ### Input
 
-Under the bugs' 'vision', predators are red, herbivores are blue, plants are green, rock and water is white (this does not correspond exactly to the graphics overlay). Each of the sensors varies from 0.0 to 1.0 representing the intensity of each color in the field of vision. Maximum values without touching is 0.9.
+Under the bugs' 'vision', predators are red, herbivores are blue, plants are green, rock and water is white (this does not correspond exactly to the graphics overlay). Each of the sensors varies from 0 to 1 representing the intensity of each color in the field of vision. Maximum values without touching is 0.9. A tenth input is the current energy level (also normalized between 0 and 1).
 
-This is illustrated in the following examples, where in each case a green bug is selected:
+This is illustrated in the following examples. Note that the colours get brighter and duller dependending on proximity, and mix when more than one object is in the detection range (shown by the circles) for a particular sensor. The white bar represents the energy level.
 
-![Screenshot](selected1.png "Screenshot")
+![Screenshot](bug5.png "Screenshot")
 <!-- ![Screenshot](selected2.png "Screenshot") -->
-![Screenshot](selected3.png "Screenshot")
+![Screenshot](bug6.png "Screenshot")
+![Screenshot](bug1.png "Screenshot")
 <!-- ![Screenshot](selected4.png "Screenshot") -->
+![Screenshot](bug3.png "Screenshot")
+![Screenshot](bug7.png "Screenshot")
+![Screenshot](bug8.png "Screenshot")
+![Screenshot](bug9.png "Screenshot")
 
 ### Output
 
