@@ -38,7 +38,7 @@ FLIGHT_SPEED = 5.    # After this speed, a creature takes flight
 FLIGHT_BOOST = 3.    # Speed is multiplied by this factor if in flight 
 DIVIDE_LIMIT = 1.4   # Divide when at this proportion of energy
 
-def burn(angle,speed,size)
+def burn(angle,speed,size):
     '''
         How much energy is burned for a bug of this size, moving at this speed, changing angle by thus much.
     '''
