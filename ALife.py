@@ -2,11 +2,11 @@
 import sys
 sys.path.append("alife")
 
-map_file = None
+map_file = "map_islands2.dat"
 if len(sys.argv) > 1:
     map_file = sys.argv[1]
 
-init_sprites = 2
+init_sprites = 0
 if len(sys.argv) > 2:
     init_sprites = int(sys.argv[2])
 
