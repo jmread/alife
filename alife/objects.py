@@ -29,13 +29,20 @@ observ_space = BugSpace(0.,1.,(N_INPUTS,))
 IDX_ANGLE = 0
 IDX_SPEED = 1
 N_OUTPUTS = 2
-action_space = BugSpace(array([-pi/6., -10.]), array([pi/6.,10.]))
+action_space = BugSpace(array([-pi/4., -10.]), array([pi/4.,10.]))
 
 # Some constants
 TERRAIN_DAMAGE = 1.  # Added factor when hitting a wall or landing on water
 BOUNCE_DAMAGE = 10.  # Multiplied factor when hitting a friend
 FLIGHT_SPEED = 5.    # After this speed, a creature takes flight
+FLIGHT_BOOST = 3.    # Speed is multiplied by this factor if in flight 
 DIVIDE_LIMIT = 1.4   # Divide when at this proportion of energy
+
+def burn(angle,speed,size)
+    '''
+        How much energy is burned for a bug of this size, moving at this speed, changing angle by thus much.
+    '''
+    return ((1.+abs(speed))**3 + (1.+abs(angle))**2) * (size / 10000.0)
 
 
 class Thing(pygame.sprite.DirtySprite):
@@ -122,7 +129,7 @@ class Thing(pygame.sprite.DirtySprite):
         self.remove()
         self = None
 
-def spawn_agent(ID, agent_def="alife.rl.evolution:Evolver"):
+def spawn_agent(agent_def="alife.rl.evolution:Evolver"):
     ''' 
         Spawn a new creature and give it a rl (agent).
 
@@ -157,14 +164,15 @@ class Creature(Thing):
         self._calories = self.calories
         # DNA (the agent)
         if isinstance(dna, str):
-            self.b = spawn_agent(self.ID, dna)
-        elif isinstance(dna, Agent):
-            self.b = dna.spawn()
-        else:
-            self.b = spawn_agent(self.ID)
+            self.brain = spawn_agent(dna)
+        elif dna is None:
+            print("Error: No Agent definition given.")
+            exit(1)
+        else: # isinstance(dna, Agent):
+            self.brain = dna.spawn_copy()
 
     def __str__(self):
-        return ("Type %s; Gen. %d" % (str(self.b),self.generation))
+        return ("Type %s; Gen. %d" % (str(self.brain),self.generation))
 
     def move(self):
         ''' Move and Wrap '''
@@ -252,7 +260,7 @@ class Creature(Thing):
         x = self.state[0:N_INPUTS]           # observation 
         r = self.calories - self._calories # reward = energy diff from last timestep
         self._calories = self.calories     # (save the current energy)
-        y = self.b.act(x,r)                # call upon the agent to act
+        y = self.brain.act(x,r)                # call upon the agent to act
 
         self.process_actions(y)            # ... and enact them.
 
@@ -270,16 +278,16 @@ class Creature(Thing):
         if angle < -0.01 or angle > 0.01:
             self.velocity = rotate(self.velocity,angle)
         u = unitv(self.velocity)
-        self.velocity = u * speed + (speed > 5.) * 3.
+        self.velocity = u * speed + (speed > FLIGHT_SPEED) * FLIGHT_BOOST
         # Update antennae
         self.pa1 = rotate(u * self.radius*3,+0.3) # antenna left pos
         self.pa2 = rotate(u * self.radius*3,-0.3) # antenna right pos
-        # Now move (this burns energy according to size and speed)
-        self.calories = self.calories - (1.+abs(speed))**3 * (self.radius / 10000.0)
+        # Now move (this burns energy according to size and speed and the angle of turn)
+        self.calories = self.calories - burn(angle, speed, self.radius)
         self.move();
         # Divide (if we are DIVIDE_LIMIT times over the limit)
         if self.calories > (self.rep_limit * DIVIDE_LIMIT):
-            Creature(self.pos+u * -self.radius * 3., dna = self.b, generation = self.generation+1, cal = self.rep_limit * 0.2, lim = self.rep_limit, food_ID = self.food_ID, ID = self.ID)
+            Creature(self.pos+u * -self.radius * 3., dna = self.brain, generation = self.generation+1, cal = self.rep_limit * 0.2, lim = self.rep_limit, food_ID = self.food_ID, ID = self.ID)
             self.calories = self.rep_limit * 1.05
             # Reproduction does not depress the creature (does not affect its reward signal)
             gain = self.calories - self._calories

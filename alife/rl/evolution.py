@@ -1,5 +1,6 @@
 from numpy import *
 from agent import Agent
+from copy import copy
 
 class Evolver(Agent):
     '''
@@ -57,7 +58,7 @@ class Evolver(Agent):
         a[1] = clip(a[1], self.A.low[1], self.A.high[1])
         return a
 
-    def spawn(self):
+    def spawn_copy(self):
         """
             Spawn.
 

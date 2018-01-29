@@ -55,7 +55,7 @@ class World:
         prosperity = 50
 
         ## GRID REGISTER and GRID COUNT 
-        self.register = [[[None for l in xrange(MAX_GRID_DETECTION)] for k in xrange(self.N_ROWS)] for j in xrange(self.N_COLS)]
+        self.register = [[[None for l in range(MAX_GRID_DETECTION)] for k in range(self.N_ROWS)] for j in range(self.N_COLS)]
         self.regcount = zeros(map_codes.shape,int) 
 
         ## INIT ##
@@ -85,18 +85,18 @@ class World:
         
         # Some rocks and plants
         FACTOR = init_sprites
-        for i in range(self.N_ROWS*((FACTOR/2)**2)):
+        for i in range(int(self.N_ROWS*((FACTOR/2)**2))):
             Thing(random_position(self), mass=100+random.rand()*1000, ID=ID_ROCK)
-        for i in range(self.N_ROWS*((FACTOR/2)**2)):
+        for i in range(int(self.N_ROWS*((FACTOR/2)**2))):
             Thing(random_position(self), mass=100+random.rand()*1000, ID=ID_PLANT)
 
         # Get a list of the agents we may deploy 
         agents_available = get_list('agents_to_use.txt')
 
         # Some animate creatures
-        for i in range(self.N_ROWS*FACTOR/4*2):
+        for i in range(int(self.N_ROWS*FACTOR/4*2)):
             Creature((random_position(self)), dna = agents_available[random.choice(len(agents_available))], cal = 75, lim = 150)
-        for i in range(self.N_ROWS*FACTOR/6*2):
+        for i in range(int(self.N_ROWS*FACTOR/6*2)):
             Creature((random_position(self)), dna = agents_available[random.choice(len(agents_available))], cal = 200, lim = 400, ID = ID_PREDATOR, food_ID = ID_ANIMAL)
 
         self.allSprites.clear(self.screen, background)
@@ -143,11 +143,13 @@ class World:
                         print("New Plant")
                         Thing(array(pygame.mouse.get_pos()), mass=100+random.rand()*1000, ID=ID_PLANT)
                     elif event.key == pygame.K_h:
-                        print("New Creature")
-                        Creature(array(pygame.mouse.get_pos()), dna = agents_available[random.choice(len(agents_available))])
+                        agent = agents_available[random.choice(len(agents_available))]
+                        print("New Creature [%s]" % agent)
+                        Creature(array(pygame.mouse.get_pos()), dna = agent)
                     elif event.key == pygame.K_p:
-                        print("New Predator")
-                        Creature(array(pygame.mouse.get_pos()), dna = agents_available[random.choice(len(agents_available))], cal = 200, lim = 400, ID = ID_PREDATOR, food_ID = ID_ANIMAL)
+                        agent = agents_available[random.choice(len(agents_available))]
+                        print("New Predator [%s] % agent")
+                        Creature(array(pygame.mouse.get_pos()), dna = agent, cal = 200, lim = 400, ID = ID_PREDATOR, food_ID = ID_ANIMAL)
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     print("Click")
                     a_sth,sel_obj,square = self.check_collisions_p(pygame.mouse.get_pos(), 20., None, rext=0.)
@@ -202,8 +204,8 @@ class World:
                     self.screen.blit(label, [anchor+1,6])
                     if save_to_file:
                         st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')
-                        fname = ("./dat/dna/Obj.%d.%s.%s.%d.%s.dat" % (sel_obj.ID,str(sel_obj.__class__.__name__),str(sel_obj.b.__class__.__name__),sel_obj.generation,str(st)))
-                        sel_obj.b.save(fname)
+                        fname = ("./dat/dna/Obj.%d.%s.%s.%d.%s.dat" % (sel_obj.ID,str(sel_obj.__class__.__name__),str(sel_obj.brain.__class__.__name__),sel_obj.generation,str(st)))
+                        sel_obj.brain.save(fname)
                         print("Saved agent to '%s'." % fname)
                     # Body
                     pygame.draw.circle(self.screen, rgb2color(sel_obj.state[IDX_COLIDE],id2rgb[sel_obj.ID]), (int(sel_obj.pos[0]),int(sel_obj.pos[1])), int(sel_obj.radius + 3), 4)
@@ -236,8 +238,9 @@ class World:
 
 
 
-    def grid2pos(self,(x,y)):
+    def grid2pos(self,xy):
         ''' grid reference to numpy coordinate array '''
+        x,y = xy
         px = x * GRID_SIZE + 0.5 * GRID_SIZE
         py = y * GRID_SIZE + 0.5 * GRID_SIZE
         return array([px,py])
@@ -248,8 +251,10 @@ class World:
         ry = max(min(int(p[1]/GRID_SIZE),self.N_ROWS-1),0)
         return rx,ry
 
-    def point_on_the_wall_closest_to_me(self,p,(x,y),(tx,ty)):
-        ''' I am at point p in square x,y, return the closest point of the tile with centre (tx,ty) '''
+    def point_on_the_wall_closest_to_me(self,p,tile,grid):
+        ''' I am at point p in square tile = (x,y), return the closest point of the tile with centre (tx,ty) '''
+        x = tile[0]
+        tx,ty = grid
         tile_wall = self.grid2pos((tx,ty))
         if tx == x:
             # (tile is to the right or left)
@@ -270,7 +275,7 @@ class World:
             self.register[x][y][c] = sprite
             self.regcount[x,y] = c + 1
         else:
-            print "WARNING: Grid full, not registering!"
+            print("WARNING: Grid full, not registering!")
             exit(1)
 
     def check_collisions_p(self, s_point, s_radius, excl, rext=0.):
