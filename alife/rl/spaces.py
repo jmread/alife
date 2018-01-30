@@ -5,7 +5,7 @@ class BugSpace():
     """
         Continous spaces in the form of numpy arrays.
         
-        Like the Box space in aigym.
+        Like the Box space in AIGym.
     """
 
     def __init__(self, low, high, shape=None):

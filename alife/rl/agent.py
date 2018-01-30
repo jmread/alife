@@ -43,7 +43,7 @@ class Agent():
         '''
         pickle.dump( self, open( file_name, "wb" ) )
 
-    def spawn(self):
+    def spawn_copy(self):
         """
             Spawn.
 
