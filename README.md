@@ -75,6 +75,13 @@ No interaction is required. But you may select an agent by clicking on it and th
 
 
 
+Implementing Your Own Agent
+---------------------------
+
+You can simply add the path and classname of your agent in `agents_to_use.txt`. An example is given in `./alife/rl/evolution.py`. The agent should be in a class of similar style to [AIGym](https://gym.openai.com/docs/) and needs `__init__` and `act` functions of the same style. In this world, creatures also have a `spawn_copy` function which details how to copy itself when a bug reproduces (i.e., an evolutionary component). Even in non-evolutionary algorithms, this function can be used to add a variation to the hyper-parameters, and pass on existing knowledge.
+
+If multiple agents are defined, multiple agents will be spawned randomly at the beginning. The more suited agents should eventually out-compete the others and be the only ones remaining, therefore it can be used to test different reinforcement learning algorithms against each other.
+
 
 Related Projects
 ----------------
