@@ -58,20 +58,22 @@ If you have all the requirements, then run, for example,
 	python ALife.py dat/maps/map_islands2.dat 5
 ```
 
-to load with the map from the file `map_islands2.dat` (optional). The map can be edited by hand in the text file. By default, an empty map is used (no terrain). The number indicates how many creatures are to be spawned on initialization; 0 is none, 8 is a lot.
+to load with the map from the file `map_islands2.dat` (optional). The map can be edited by hand in the text file. The number indicates the density of bugs to be spawned on startup; 0 is none, 8 is a lot.
 
 No interaction is required. But you may select an agent by clicking on it and thus viewing info (sensors, health, etc.) Also, the following keys are available:
 
-* <kbd>g</kbd> -	Toggle graphics (turn animation off for faster iterations)
-* <kbd>d</kbd> -	Toggle grid 
-* <kbd>r</kbd> -	Add a new 'plant' (under the mouse pointer)
-* <kbd>h</kbd> -	Add a new 'herbivore' (under the mouse pointer)
-* <kbd>p</kbd> -	Add a new 'predator' (under the mouse pointer)
-* <kbd>k</kbd> -	Add a new 'rock' (under the mouse pointer)
-* <kbd>s</kbd> -	Saving currently selected creature to disk ('./dat/dna/')
-* <kbd>l</kbd> -	Load creatures currently saved on disk ('./dat/dna/')
+* <kbd>g</kbd> -	Toggle graphics (turn animation off for faster iterations, i.e., fast-forward)
+* <kbd>p</kbd> -	Add a new 'plant' (under the mouse pointer)
+* <kbd>r</kbd> -	Add a new 'rock' (under the mouse pointer)
+* <kbd>b</kbd> -	Add a new small 'bug' (under the mouse pointer)
+* <kbd>u</kbd> -	Add a new big 'bug' (under the mouse pointer)
+* <kbd>s</kbd> -	Saving currently selected creature to disk <!-- ('./dat/dna/')-->
+* <kbd>l</kbd> -	Load creatures currently saved on disk <!-- ('./dat/dna/')-->
+* <kbd>d</kbd> -	Toggle grid (for debugging)
 * <kbd>&uarr;</kbd> - More energy input to the environment (more plant growth)
 * <kbd>&darr;</kbd> - Less energy input to the environment (less plant growth)
+* <kbd>&rarr;</kbd> - More frames per second
+* <kbd>&larr;</kbd> - Fewer frames per second
 
 
 
