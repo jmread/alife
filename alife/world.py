@@ -31,8 +31,7 @@ def get_list(filename):
         return f.read().splitlines()
 
 def random_position(world):
-    ''' A random position somewhere on the screen '''
-    # TODO: only return positions over land!
+    ''' A random position somewhere on the screen (over land tiles) '''
     k = random.choice(world.terrain.shape[0])
     j = random.choice(world.terrain.shape[1])
     while world.terrain[k,j] > 0:
@@ -59,7 +58,7 @@ class World:
         self.regcount = zeros(map_codes.shape,int) 
 
         ## INIT ##
-        pygame.display.set_caption("ALife")
+        pygame.display.set_caption("Bug World")
         self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT))#, HWSURFACE|DOUBLEBUF)
         pygame.mouse.set_visible(1)
 
@@ -95,9 +94,9 @@ class World:
 
         # Some animate creatures
         for i in range(int(self.N_ROWS*FACTOR/4*2)):
-            Creature((random_position(self)), dna = agents_available[random.choice(len(agents_available))], cal = 75, lim = 150)
+            Creature((random_position(self)), dna = agents_available[random.choice(len(agents_available))], energy = 75, energy_limit = 150)
         for i in range(int(self.N_ROWS*FACTOR/6*2)):
-            Creature((random_position(self)), dna = agents_available[random.choice(len(agents_available))], cal = 200, lim = 400, ID = ID_PREDATOR, food_ID = ID_ANIMAL)
+            Creature((random_position(self)), dna = agents_available[random.choice(len(agents_available))], energy = 200, energy_limit = 400, ID = ID_PREDATOR, food_ID = ID_ANIMAL)
 
         self.allSprites.clear(self.screen, background)
 
@@ -105,9 +104,9 @@ class World:
         sel_obj = None 
         GRAPHICS_ON = True
         GRID_ON = False
+        self.FPS = FPS
         while True:
-            self.clock.tick(FPS)
-            save_to_file = False
+            self.clock.tick(self.FPS)
 
             for event in pygame.event.get():
                 if event.type == QUIT:
@@ -117,39 +116,48 @@ class World:
                         GRAPHICS_ON = (GRAPHICS_ON != True)
                     elif event.key == pygame.K_d:
                         GRID_ON = (GRID_ON != True)
-                    elif event.key == pygame.K_s:
-                        save_to_file = True
+                    elif event.key == pygame.K_s and sel_obj is not None:
+                        print("Save ...")
+                        #time_stamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')
+                        sel_obj.brain.save("./dat/dna/", "./dat/log/", sel_obj.ID)
                     elif event.key == pygame.K_l:
                         print("Loading ...")
                         for filename in glob.glob('./dat/dna/*.dat'):
                             brain = pickle.load(open(filename, "rb"))
                             meta_data = filename.split(".")
                             ID = int(meta_data[2])
-                            params = (100,200,int(meta_data[5]),ID,ID_PLANT)
+                            params = (100,200,int(meta_data[5]),ID,ID-1)
                             if ID == ID_PREDATOR:
-                                params = (200,400,int(meta_data[5]),ID,ID_ANIMAL)
-                            print("Loaded Creature ID=%d (Gen. %d) from %s ..." % (params[3],params[2],filename))
-                            Creature(array(pygame.mouse.get_pos()),dna=brain,generation = params[2], cal = params[0], lim = params[1], ID = params[3], food_ID = params[4])
+                                params = (200,400,int(meta_data[5]),ID,ID-1)
+                            print("Loaded Creature ID=%d from %s ..." % (params[3],filename))
+                            Creature(array(pygame.mouse.get_pos()+random.randn(2)*GRID_SIZE),dna=brain, energy = params[0], energy_limit = params[1], ID = params[3], food_ID = params[4])
+                    elif event.key == pygame.K_LEFT:
+                        self.FPS = self.FPS - 10
+                        print("FPS: %d" % self.FPS)
+                    elif event.key == pygame.K_RIGHT:
+                        self.FPS = self.FPS + 10
+                        print("FPS: %d" % self.FPS)
                     elif event.key == pygame.K_DOWN:
                         prosperity = prosperity + 1
                         print("Lower energy influx (new plant every %d ticks)" % prosperity)
                     elif event.key == pygame.K_UP:
                         prosperity = prosperity - 1
                         print("Higher energy influx (new plant every %d ticks)" % prosperity)
-                    elif event.key == pygame.K_k:
+                    elif event.key == pygame.K_r:
                         print("New Rock")
                         Thing(array(pygame.mouse.get_pos()),mass=500, ID=ID_ROCK)
-                    elif event.key == pygame.K_r:
+                    elif event.key == pygame.K_p:
                         print("New Plant")
                         Thing(array(pygame.mouse.get_pos()), mass=100+random.rand()*1000, ID=ID_PLANT)
-                    elif event.key == pygame.K_h:
+                    elif event.key == pygame.K_b:
                         agent = agents_available[random.choice(len(agents_available))]
-                        print("New Creature [%s]" % agent)
+                        print("New small Bug [%s]" % agent)
                         Creature(array(pygame.mouse.get_pos()), dna = agent)
-                    elif event.key == pygame.K_p:
+                    elif event.key == pygame.K_u:
                         agent = agents_available[random.choice(len(agents_available))]
-                        print("New Predator [%s] % agent")
-                        Creature(array(pygame.mouse.get_pos()), dna = agent, cal = 200, lim = 400, ID = ID_PREDATOR, food_ID = ID_ANIMAL)
+                        print("New big Bug [%s]" % agent)
+                        Creature(array(pygame.mouse.get_pos()), dna = agent, energy = 200, energy_limit = 400, ID = ID_PREDATOR, food_ID = ID_ANIMAL)
+
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     print("Click")
                     a_sth,sel_obj,square = self.check_collisions_p(pygame.mouse.get_pos(), 20., None, rext=0.)
@@ -159,7 +167,7 @@ class World:
             if step % prosperity == 0 and len(self.plants) < RESOURCE_LIMIT:
                 p = random_position(self)
                 Thing(p, mass=100+random.rand()*1000, ID=ID_PLANT)
-                print("Time step %d; %d creatures alive" % (step,len(self.creatures)))
+                print("Time step %d; %d bugs alive" % (step,len(self.creatures)))
 
             # Reset reg-counts
             self.regcount = zeros((self.N_COLS,self.N_ROWS),int) 
@@ -181,8 +189,8 @@ class World:
 
                 for r in self.creatures:
                     # Feelers
-                    pygame.draw.line(self.screen, rgb2color(r.state[IDX_PROBE1],id2rgb[r.ID]), r.pos, r.pos+r.pa1, 1)
-                    pygame.draw.line(self.screen, rgb2color(r.state[IDX_PROBE2],id2rgb[r.ID]), r.pos, r.pos+r.pa2, 1)
+                    pygame.draw.line(self.screen, rgb2color(r.observation[IDX_PROBE1],id2rgb[r.ID]), r.pos, r.pos+r.pa1, 1)
+                    pygame.draw.line(self.screen, rgb2color(r.observation[IDX_PROBE2],id2rgb[r.ID]), r.pos, r.pos+r.pa2, 1)
                     # Tail / Wings
                     if norm(r.velocity) > FLIGHT_SPEED:
                         # (if in flight)
@@ -202,20 +210,15 @@ class World:
                     s = str(sel_obj)
                     label = myfont.render(s, 1, COLOR_WHITE)
                     self.screen.blit(label, [anchor+1,6])
-                    if save_to_file:
-                        st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d_%H%M%S')
-                        fname = ("./dat/dna/Obj.%d.%s.%s.%d.%s.dat" % (sel_obj.ID,str(sel_obj.__class__.__name__),str(sel_obj.brain.__class__.__name__),sel_obj.generation,str(st)))
-                        sel_obj.brain.save(fname)
-                        print("Saved agent to '%s'." % fname)
                     # Body
-                    pygame.draw.circle(self.screen, rgb2color(sel_obj.state[IDX_COLIDE],id2rgb[sel_obj.ID]), (int(sel_obj.pos[0]),int(sel_obj.pos[1])), int(sel_obj.radius + 3), 4)
+                    pygame.draw.circle(self.screen, rgb2color(sel_obj.observation[IDX_COLIDE],id2rgb[sel_obj.ID]), (int(sel_obj.pos[0]),int(sel_obj.pos[1])), int(sel_obj.radius + 3), 4)
                     # Rangers
-                    pygame.draw.circle(self.screen, rgb2color(sel_obj.state[IDX_PROBE1],COLOR_BLACK), (int((sel_obj.pos+sel_obj.pa1)[0]),int((sel_obj.pos+sel_obj.pa1)[1])), int(sel_obj.radius*3.), 2)
-                    pygame.draw.circle(self.screen, rgb2color(sel_obj.state[IDX_PROBE2],COLOR_BLACK), (int((sel_obj.pos+sel_obj.pa2)[0]),int((sel_obj.pos+sel_obj.pa2)[1])), int(sel_obj.radius*3.), 2)
-                    pygame.draw.circle(self.screen, rgb2color(sel_obj.state[IDX_COLIDE],COLOR_BLACK), (int(sel_obj.pos[0]),int(sel_obj.pos[1])), int(sel_obj.radius*4.), 3)
+                    pygame.draw.circle(self.screen, rgb2color(sel_obj.observation[IDX_PROBE1],COLOR_BLACK), (int((sel_obj.pos+sel_obj.pa1)[0]),int((sel_obj.pos+sel_obj.pa1)[1])), int(sel_obj.radius*3.), 2)
+                    pygame.draw.circle(self.screen, rgb2color(sel_obj.observation[IDX_PROBE2],COLOR_BLACK), (int((sel_obj.pos+sel_obj.pa2)[0]),int((sel_obj.pos+sel_obj.pa2)[1])), int(sel_obj.radius*3.), 2)
+                    pygame.draw.circle(self.screen, rgb2color(sel_obj.observation[IDX_COLIDE],COLOR_BLACK), (int(sel_obj.pos[0]),int(sel_obj.pos[1])), int(sel_obj.radius*4.), 3)
                     # Health/Calories/Energy level
                     pygame.draw.line(self.screen, COLOR_WHITE, sel_obj.pos-20, [sel_obj.pos[0]+20,sel_obj.pos[1]-20], 1)
-                    pygame.draw.line(self.screen, COLOR_WHITE, sel_obj.pos-20, [sel_obj.pos[0]-20+(sel_obj.state[IDX_ENERGY]*40),sel_obj.pos[1]-20], 5)
+                    pygame.draw.line(self.screen, COLOR_WHITE, sel_obj.pos-20, [sel_obj.pos[0]-20+(sel_obj.observation[IDX_ENERGY]*40),sel_obj.pos[1]-20], 5)
 
             if GRID_ON:
 
@@ -234,7 +237,7 @@ class World:
                 rects = self.allSprites.draw(self.screen)
                 pygame.display.update(rects)
                 pygame.display.flip()
-                pygame.time.delay(FPS)
+                pygame.time.delay(self.FPS)
 
 
 
