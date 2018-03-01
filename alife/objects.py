@@ -159,7 +159,7 @@ class Creature(Thing):
         self.food_ID = food_ID
         # Attributes
         self.velocity = 0.
-        self.process_actions(action=action_space.sample())
+        self.env_step(action=action_space.sample())
         self.observation = zeros(N_INPUTS, dtype=float)       
         self._energy = self.energy
         # DNA (the agent)
@@ -254,20 +254,22 @@ class Creature(Thing):
         action = self.brain.act(self.observation,reward) # call upon the agent to act
 
         # Move
-        self.process_actions(action)              # ... and enact them.
+        self.env_step(action)              # ... and enact them.
 
         # Wrap around the world
         self.wrap(world)
 
-    def process_actions(self,action):
+    def env_step(self,action):
         '''
-            Process Actions.
+            Process actions on the environment.
 
             Using action[0] (angle) and action[1] (speed) component.
         '''
+
+        # Only allow a certain range of actions in this environment
+        angle = clip(action[IDX_ANGLE], action_space.low[0], action_space.high[0])
+        speed = clip(action[IDX_SPEED], action_space.low[0], action_space.high[0])
         # New velocity vector
-        angle = action[IDX_ANGLE]
-        speed = action[IDX_SPEED]
         if angle < -0.01 or angle > 0.01:
             self.velocity = rotate(self.velocity,angle)
         u = unitv(self.velocity)
