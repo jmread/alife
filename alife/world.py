@@ -2,17 +2,26 @@
 
 import pygame
 
-import joblib, glob, time, datetime        # <-- for saving and loading agents from disk
-
 from graphics import *
 from objects import *
 
+# For saving and loading agents from disk
+import joblib, glob, time, datetime
+
 # Parameters
-FPS = 60                                    # <-- higher = less CPU
-GRID_SIZE = 64                              # tile size
-VISION = GRID_SIZE*0.5                      # vision in the murky waters
-MAX_GRID_DETECTION = 100                    # maximum number of objects that can be detected at once
-RESOURCE_LIMIT = 1000                       # maximum number of plants
+FPS = 60                     # <-- higher = less CPU
+GRID_SIZE = 64               # tile size
+VISION = GRID_SIZE*0.5       # vision in the murky waters
+MAX_GRID_DETECTION = 100     # maximum number of objects that can be detected at once
+RESOURCE_LIMIT = 1000        # maximum number of plants
+TOUCH_THRESHOLD = 0.9        # maximum visual field occupied by color if not actually touching anything
+
+def get_intensity(dist, radius):
+    ''' 
+        Return a pixel intensity for our vision depending (inversely) on 
+        how close we are to something, and how large that thing is.
+    '''
+    return (-dist / radius) * (dist < 0.)
 
 class DrawGroup(pygame.sprite.Group):
     def draw(self, surface):
@@ -58,7 +67,7 @@ class World:
         self.regcount = zeros(map_codes.shape,int) 
 
         ## INIT ##
-        pygame.display.set_caption("Bug World")
+        pygame.display.set_caption("ALife / Bug World")
         self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT))#, HWSURFACE|DOUBLEBUF)
         pygame.mouse.set_visible(1)
 
@@ -160,7 +169,7 @@ class World:
 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     print("Click")
-                    a_sth,sel_obj,square = self.check_collisions_p(pygame.mouse.get_pos(), 20., None, rext=0.)
+                    a_sth,sel_obj,square = self.check_collisions(pygame.mouse.get_pos(), 20., None, collision_radius=0.)
 
             # Make sure there is a constant flow of resources/energy into the system
             step = step + 1
@@ -254,8 +263,8 @@ class World:
         ry = max(min(int(p[1]/GRID_SIZE),self.N_ROWS-1),0)
         return rx,ry
 
-    def point_on_the_wall_closest_to_me(self,p,tile,grid):
-        ''' I am at point p in square tile = (x,y), return the closest point of the tile with centre (tx,ty) '''
+    def closest_point_on_wall(self,p,tile,grid):
+        ''' Return the point on border of tile=[x,y] which is closes to point p '''
         x = tile[0]
         tx,ty = grid
         tile_wall = self.grid2pos((tx,ty))
@@ -264,7 +273,6 @@ class World:
             tile_wall[1] = p[1]
         else:
             # (tile is above or below)
-            tile_wall = self.grid2pos((tx,ty))
             tile_wall[0] = p[0]
         return tile_wall
 
@@ -281,77 +289,84 @@ class World:
             print("WARNING: Grid full, not registering!")
             exit(1)
 
-    def check_collisions_p(self, s_point, s_radius, excl, rext=0.):
+    def check_collisions(self, s_point, s_radius, excl=None, collision_radius=0.):
         '''
-            Check Collisions
-            -------------------------------------------------------------------------------
+            Check collisions of some circle s (defined by s_point and s_radius) in the world.
 
-            Check for collisions of point 's_point' with radius 's_radius'
-            -- excluding object 'excl' from search.
-            -- If radius 'rext' is specified, then consider this a collision.
-
-            Return (A,B,C) where
-                A : the color of the object we collided with
-                B : the object itself that we collided with (None if terrain)
-                C : the type of terrain we collided with (None if object)
+            The point and radius specified do not necessarily have to be a sprite.
 
             TODO: take list of points and radii
-
             TODO: if touching object (inverse distance = 1, then all other objects are ignored)
+
+            Parameters
+            ----------
+
+            s_point : tuple (x,y)
+                the centre point of the object of interest
+
+            s_radius : float
+                the radius of the object
+
+            excl : Thing
+                exclude this object from the search
+
+            collision_radius : float
+                if radius 'collision_radius' is specified, then return the object we collide with
+
+
+            Returns
+            -------
+            
+            A tuple (color,object,type) where 
+                vision : the [R,G,B] color of the resulting collisions 
+                thing : the Thing that we collided with (None if terrain)
+                type : the type of terrain we collided with (None if Thing)
+
         '''
 
         # We are currently in grid (x,y)
         x, y = self.pos2grid(s_point)
 
-        # By default, we are not colliding with anything
-        a = array([0.,0.,0.,])
-        obj = None
+        # By default, we don't see anything (pure blackness)
+        vision = array([0.,0.,0.,])
+        thing = None
 
         if self.terrain[y,x] > 0:
-            # Already inside (clashing against) the wall
-            a = array([1.,1.,1.,])
-            return a, None, self.grid2pos((x,y))
+            # We are colliding with (over) impassable terrain
+            vision = array([1.,1.,1.,])
+            return vision, None, self.grid2pos((x,y))
 
         # Check collisions with objects in current and neighbouring tiles  
-        # (TODO: Wrapping might actually be easier!)
         for i in [-1,0,+1]:
             p_x = (x + i) % self.N_COLS
-            # p_x = min(max(x+i,0),self.N_COLS-1)
             for j in [-1,0,+1]:
                 p_y = (y + j) % self.N_ROWS
-                # p_y = min(max(y+j,0),self.N_ROWS-1)
 
-                # This tile is terrain -- check for proximity with it!
+                # If we are looking at terrain ...
                 if i != 0 and j != 0 and self.terrain[p_y,p_x] > 0:
-                    wall_point = self.point_on_the_wall_closest_to_me(s_point,(x,y),(p_x,p_y))
+                    # ... check proximity to it.
+                    wall_point = self.closest_point_on_wall(s_point,(x,y),(p_x,p_y))
                     d = proximity(s_point, wall_point) - (s_radius + (GRID_SIZE * 0.5)) # (wall 'radius' is half a tile)
-                    if d < 0.:
-                        # In visual range, so calulate how much of the vision blocked (as done below) ...
-                        a = a + id2rgb[ID_ROCK] * -d / s_radius
+                    vision = vision + id2rgb[ID_ROCK] * get_intensity(d,s_radius)
 
-                # The neighbouring tile is empty -- check for collisions with other objects!
+                # Check for collisions with other objects in this tile
                 things = self.register[p_x][p_y]
                 for i in range(self.regcount[p_x,p_y]):
-                    # Is this object something other than myself? 
+                    # Check if I should skip this object
                     if things[i] != excl:
-                        # How far are we from it ?
+                        # Else, how far are we from it ?
                         d = proximity(s_point,things[i].pos) - (s_radius + things[i].radius)
                         if d < -s_radius:
-                            # We are touching! Return this object.
+                            # We are touching, return this object.
                             return id2rgb[things[i].ID], things[i], None
                         elif d < 0.:
-                            # In visual range, so calulate how much of the vision blocked 
-                            # (should be a function of radius [i.e., weight] and inverse distance [to target]) 
-                            # ... and add it to the input spectrum
-                            a = a + id2rgb[things[i].ID] * -d / s_radius
-                            if  rext > 0. and (proximity(s_point,things[i].pos) - (rext + things[i].radius)) < 0:
-                                obj = things[i]
+                            # We are in visual range, add the relevant intensity to our 'vision'
+                            vision = vision + id2rgb[things[i].ID] * get_intensity(d, s_radius)
+                            if  collision_radius > 0. and (proximity(s_point,things[i].pos) - (collision_radius + things[i].radius)) < 0:
+                                thing = things[i]
 
         # We should only reach 1.0 if actually touching, even if visual field is overwhelmed;
-        # (if we got this far, we didn't collide totally)
-        # TODO should be relative, sigmoid/logarithmic ?
-        a = clip(a,0.0,0.9)
-        #a = clip(0.95/(1. + exp(-a-1.)),0.0,0.95)
-        #print("a",a)
-        return a, obj, None
+        # (and if we got this far, we are not touching anything)
+        vision = clip(vision,0.0,TOUCH_THRESHOLD) # TODO could be relative, sigmoid/logarithmic ?
+        return vision, thing, None
 
