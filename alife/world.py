@@ -162,19 +162,19 @@ class World:
                         Thing(array(pygame.mouse.get_pos()), mass=100+random.rand()*cfg['max_plant_size'], ID=ID_PLANT)
                     elif event.key == pygame.K_4 and len(agents) >= (4-4):
                         print("New Agent")
-                        Creature(array(pygame.mouse.get_pos()), dna = agents[4-4], ID = 4)
+                        Creature(array(pygame.mouse.get_pos()), dna = list(agents)[4-4], ID = 4)
                     elif event.key == pygame.K_5 and len(agents) >= (5-4):
                         print("New Agent")
-                        Creature(array(pygame.mouse.get_pos()), dna = agents[5-4], ID = 5)
+                        Creature(array(pygame.mouse.get_pos()), dna = list(agents)[5-4], ID = 5)
                     elif event.key == pygame.K_6 and len(agents) >= (6-4):
                         print("New Agent")
-                        Creature(array(pygame.mouse.get_pos()), dna = agents[6-4], ID = 6)
+                        Creature(array(pygame.mouse.get_pos()), dna = list(agents)[6-4], ID = 6)
                     elif event.key == pygame.K_7 and len(agents) >= (7-4):
                         print("New Agent")
-                        Creature(array(pygame.mouse.get_pos()), dna = agents[7-4], ID = 7)
+                        Creature(array(pygame.mouse.get_pos()), dna = list(agents)[7-4], ID = 7)
                     elif event.key == pygame.K_8 and len(agents) >= (8-4):
                         print("New Agent")
-                        Creature(array(pygame.mouse.get_pos()), dna = agents[8-4], ID = 8)
+                        Creature(array(pygame.mouse.get_pos()), dna = list(agents)[8-4], ID = 8)
                     elif event.key == pygame.K_h:
                         print("=== HELP ===")
                         dic = ["VOID", "ROCK", "MISC", "BUG1", "BUG2", "BUG3"]
