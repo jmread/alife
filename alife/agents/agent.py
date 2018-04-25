@@ -2,6 +2,7 @@ import numpy as np
 import random
 import pickle
 import string
+from copy import copy
 
 class Agent():
 
@@ -65,7 +66,7 @@ class Agent():
                 - a reward (obtained in the last time step)
             it returns an action (to carry out). 
         '''
-        raise NotImplemntedError
+        raise NotImplementedError
 
     def spawn_copy(self):
         """
@@ -79,4 +80,5 @@ class Agent():
             
             A new copy (child) of this agent, [optionally] based on this one (the parent).
         """
-        raise NotImplemntedError
+        # By default, we just return a clone of this agent. 
+        return copy(self)

@@ -1,0 +1,24 @@
+world:
+    factor: 2             # how many sprites per grid square
+    tile_size: 64         # the length (and width) of a tile in pixels
+    max_grid_objects: 100 # maximum objects that can be detected at once
+    fps : 60              # frames per second
+    growth_rate : 200     # growth rate of plants (number per tick)
+    max_plant_size : 1500
+objects:
+    terrain_damage : 1.5
+    bounce_damage : 1.
+    flight_speed : 5.0
+    flight_boost : 5.0
+    default_mass_thing : 500
+    default_mass_bug : 300
+    bite_ratio : 0.05
+    init_energy : 1.0
+    touch_threshold : 0.9    # after this level is considered touch
+    divide_limit : 2.0
+bugs: 
+    1 : alife.agents.evolution:Evolver
+    2 : alife.agents.evolution:MLP
+    3 : alife.agents.evolution:ESN
+#    4 : alife.agents.sarsa:Sarsa
+#    5 : alife.agents.hill_climbing:SimpleHillClimber

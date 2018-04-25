@@ -56,6 +56,12 @@ docs/_build/
 # PyBuilder
 target/
 
+# Other file types
+*.xcf
+*.pdf
+*.old
+
 # Other directories
 other
 trash
+dat/dna/

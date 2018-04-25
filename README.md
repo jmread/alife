@@ -1,10 +1,12 @@
-BugWorld / ALife V0.30a
+BugWorld / ALife V0.45a
 =======================
 
-This began as one of many 'artificial life' projects in a simple 2D world, where emergent behaviour can arise. But unlike many similar, the creatures (bugs) here do not rely entirely on evolution to improve their behaviour generation-by-generation but use *reinforcement learning* in order to learn useful behaviours by experiences within one generation.
+An 'artificial life' project in a simple 2D world, where emergent behaviour can arise. Unlike many similar, the creatures (they are *bugs*) here do not rely entirely on evolution to improve their behaviour generation-by-generation but use *reinforcement learning* in order to learn useful behaviours by experiences within one generation.
 
 ![Screenshot](screenshot.png "Screenshot")
 
+
+<!--
 There are plants, herbivores, predators, and rocks. The terrain is either sand, rock, or water. 
 
 * Plants appear randomly across the maps at regular intervals.
@@ -15,14 +17,62 @@ There are plants, herbivores, predators, and rocks. The terrain is either sand, 
 * Bugs will drown if in the water for too long, but can fly over it
 * Bugs die when their energy runs out
 * Bugs spawn offspring if their energy goes above a certain level
+-->
 
-Herbivore and predator bugs are animate agents, where input is in the form of three proximity sensors (two on each antennae plus the body as a third sensor) of three values each (representing RGB intensity) plus a value for the current energy level. All range between 0 and 1. Two output actions indicate angle and speed. 
+Requirements
+------------
+	
+* pygame - http://pygame.org/ 
+* numpy - http://www.numpy.org/
+
+
+Getting Started
+---------------
+
+If you have all the requirements, then run, for example,
+
+```
+	python ALife.py
+```
+
+You can load a particual map with some initial sprites,
+
+```
+	python ALife.py dat/maps/map_islands2.dat 5
+```
+
+There are some maps in `./dat/maps/` which can be edited by hand in the text file. The number indicates the density of objects to be spawned on startup; 0 is none, 8 is a lot.
+
+No interaction is required. But you may select an agent by clicking on it and thus viewing info (sensors, energy level, etc.) Also, the following keys are available:
+
+* <kbd>g</kbd> -	Toggle graphics (turn animation off for faster iterations, i.e., fast-forward)
+* <kbd>1</kbd> -	Add a new 'rock' (under the mouse pointer)
+* <kbd>3</kbd> -	Add a new 'plant' (under the mouse pointer)
+* <kbd>4</kbd> -	Add a new 'bug' (under the mouse pointer) team 1
+* <kbd>5</kbd> -	... team 2
+* <kbd>6</kbd> -	... team 3
+* <kbd>7</kbd> -	... team 4
+* <kbd>8</kbd> -	... team 5
+* <kbd>9</kbd> -	... team 6
+* <kbd>s</kbd> -	Save the agent of the currently selected bug  <!-- ('./dat/dna/')-->
+* <kbd>l</kbd> -	Load creatures currently saved on disk <!-- ('./dat/dna/')-->
+* <kbd>d</kbd> -	Toggle grid (for debugging)
+* <kbd>.</kbd> - More energy input to the environment (more plant growth)
+* <kbd>,</kbd> - Less energy input to the environment (less plant growth)
+* <kbd>-</kbd> - More frames per second
+* <kbd>+</kbd> - Fewer frames per second
+* <kbd>&uarr;</kbd> - Move the selected bug forward
+<!-- * <kbd>&darr;</kbd> - Less energy input to the environment (less plant growth) -->
+* <kbd>&rarr;</kbd> - Turn the selected bug right
+* <kbd>&larr;</kbd> - Turn the selected bug left
+
+The bugs are animate agents, where input is in the form of three proximity sensors (two on each antennae plus the body as a third sensor) of three values each (representing RGB intensity) plus a value for the current energy level. All range between 0 and 1. Two output actions indicate angle and speed. 
 
 ### Input
 
-Under the bugs' 'vision', predators are red, herbivores are blue, plants are green, rock and water is white (this does not correspond exactly to the graphics overlay). Each of the sensors varies from 0 to 1 representing the intensity of each color in the field of vision. Maximum values without touching is 0.9. A tenth input is the current energy level (also normalized between 0 and 1).
+Under the bugs' 'vision' other bugs of the same team/species are blue, bugs from other species are red, plants are green, rock and impassable water is white. <!-- Each of the sensors varies from 0 to 1 representing the intensity of each color in the field of vision. --> Intensity depends on size and proximity and whether it is touching or not. A tenth input is the current energy level (also between 0 and 1).
 
-This is illustrated in the following examples. Note that the colours get brighter and duller dependending on proximity, and mix when more than one object is in the detection range (shown by the circles) for a particular sensor. The white bar represents the energy level.
+This is illustrated in the following examples. Note that the colours get brighter and duller depend ending on proximity, and mix when more than one object is in the detection range (shown by the circles) for a particular sensor. The white bar represents the energy level.
 
 ![Screenshot](bug5.png "Screenshot")
 <!-- ![Screenshot](selected2.png "Screenshot") -->
@@ -36,51 +86,19 @@ This is illustrated in the following examples. Note that the colours get brighte
 
 ### Output
 
-The two dimensional output output is 1) change in angle in radians (e.g., -$\pi/4$ for a 45-degree left turn), and the speed ranges from -10 pixels/step in reverse to +10 moving forward. At values above +5, the bugs take flight and do not collide with anything (including rocks, water, and plants they need to eat). 
+The two dimensional output output is 1) change in angle in radians (e.g., $-\pi/4$ for a 45-degree left turn), and the speed ranges from -10 pixels/step in reverse to +10 moving forward. At values above +5, the bugs take flight and do not collide with anything (including rocks, water, and plants they need to eat). 
+
 
 ### Reward 
 
-The reward is the energy level difference with the previous time step. Energy is burned constantly according to size, and thus in the absense of eating there is a constant negative reward. Energy is also lost proportionally to the speed of movement and change of angle, collisions with rocks and other bugs, and -- in particular -- when a herbivore bug is attacked by a predator bug. After a certain level, a creature automatically spawns a copy of itself, but this does not affect the reward.
-
-
-Requirements
-------------
-	
-* pygame - http://pygame.org/ - provides the graphics
-* numpy - http://www.numpy.org/ - provides nice vector representations for vector algebra
-
-Getting Started
----------------
-
-If you have all the requirements, then run, for example,
-
-```
-	python ALife.py dat/maps/map_islands2.dat 5
-```
-
-to load with the map from the file `map_islands2.dat` (optional). The map can be edited by hand in the text file. The number indicates the density of bugs to be spawned on startup; 0 is none, 8 is a lot.
-
-No interaction is required. But you may select an agent by clicking on it and thus viewing info (sensors, health, etc.) Also, the following keys are available:
-
-* <kbd>g</kbd> -	Toggle graphics (turn animation off for faster iterations, i.e., fast-forward)
-* <kbd>p</kbd> -	Add a new 'plant' (under the mouse pointer)
-* <kbd>r</kbd> -	Add a new 'rock' (under the mouse pointer)
-* <kbd>b</kbd> -	Add a new small 'bug' (under the mouse pointer)
-* <kbd>u</kbd> -	Add a new big 'bug' (under the mouse pointer)
-* <kbd>s</kbd> -	Saving currently selected creature to disk <!-- ('./dat/dna/')-->
-* <kbd>l</kbd> -	Load creatures currently saved on disk <!-- ('./dat/dna/')-->
-* <kbd>d</kbd> -	Toggle grid (for debugging)
-* <kbd>&uarr;</kbd> - More energy input to the environment (more plant growth)
-* <kbd>&darr;</kbd> - Less energy input to the environment (less plant growth)
-* <kbd>&rarr;</kbd> - More frames per second
-* <kbd>&larr;</kbd> - Fewer frames per second
+The reward is the energy level difference with the previous time step. Energy is burned constantly according to size, and thus in the absense of eating there is a negative reward. Energy is also lost proportionally to the speed of movement and change in direction, collisions with rocks and other bugs, and so on. After a certain energy level, a bug automatically spawns a copy of itself, but this does not affect the reward.
 
 
 
-Implementing Your Own Agent
----------------------------
+Implementing New Agents
+-----------------------
 
-You can simply add the path and classname of your agent in `agents_to_use.txt`. An example is given in `./alife/rl/evolution.py`. The agent should be in a class of similar style to [AIGym](https://gym.openai.com/docs/) and needs `__init__` and `act` functions of the same style. In this world, creatures also have a `spawn_copy` function which details how to copy itself when a bug reproduces (i.e., an evolutionary component). Even in non-evolutionary algorithms, this function can be used to add a variation to the hyper-parameters, and pass on existing knowledge.
+Add the path and classname of your agents to the `bugs` section in `conf.yml`. The agent should be in a class of similar style to [AIGym](https://gym.openai.com/docs/) and needs `__init__` and `act` functions of the same style. Examples are given in `./alife/rl/evolution.py`. In this world, creatures also have a `spawn_copy` function which details how to copy itself when a bug reproduces (i.e., an evolutionary component). Even in non-evolutionary algorithms, this function can be used to add a variation to the hyper-parameters, and pass on existing knowledge.
 
 If multiple agents are defined, multiple agents will be spawned randomly at the beginning. The more suited agents should eventually out-compete the others and be the only ones remaining, therefore it can be used to test different reinforcement learning algorithms against each other.
 
@@ -98,4 +116,4 @@ Notes on Graphics
 -----------------
 
 * Terrain obtained from from [Open Game Art](https://opengameart.org/users/chabull)
-* Sprites (bugs) from [Open Clip Art](https://openclipart.org/tags/ladybug)
+* Bug graphics from [Open Clip Art](https://openclipart.org/tags/ladybug)

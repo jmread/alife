@@ -14,7 +14,7 @@ id2rgb = array([
     [0.,0.,0.], # MISC     = 2  = BLACK
     [0.,1.,0.], # PLANT    = 3  = GREEN
     [0.,0.,1.], # ANIMAL   = 4  = BLUE
-    [1.,0.,0.], # PREDATOR = 5  = RED
+    [1.,0.,0.], # ENEMY    = 5  = RED
     ])
 
 def rgb2color(a, default=COLOR_BLACK):
@@ -30,7 +30,7 @@ def build_image_wireframe(pos,rad,ID):
     '''
         Build a wireframe image at pos, with radius rad, and ID.
     '''
-    color = rgbvec[ID]*255
+    color = id2rgb[ID]*255
     image = pygame.Surface((rad*2, rad*2))
     image.fill(COLOR_TRANSPARENT)
     image.set_colorkey(COLOR_TRANSPARENT)
@@ -72,6 +72,7 @@ land = {
         '+' : [(5,3)],
         '^' : [(2,0),(4,0)],
         'L' : [(2,5)],
+        '&' : [(3,7)],
         '-' : [(2,7)],
         '~' : [(7,7)],
     }
@@ -87,6 +88,7 @@ terr = {
         '+' : array([[1,1],[1,0]]),                       
         '^' : array([[1,1],[0,0]]),                       
         'L' : array([[1,1],[0,1]]),                       
+        '&' : array([[0,0],[1,0]]),                       
         '-' : array([[0,0],[0,0]]),                       
         '~' : array([[1,1],[1,1]]),                       
     }
@@ -99,7 +101,7 @@ def get_tree(n):
 
 def get_rock(n):
     ''' Load a rock '''
-    return pygame.image.load('./img/rock_'+str(n)+'.png')
+    return pygame.image.load('./img/rock_'+str(n)+'.png').convert_alpha()
 
 def build_image_png(pos,rad,ID):
     '''
@@ -112,16 +114,20 @@ def build_image_png(pos,rad,ID):
     elif ID == 4:
         image = pygame.image.load('./img/green_bug.png')
     elif ID == 5:
+        image = pygame.image.load('./img/red_bug.png')
+    elif ID == 6:
+        image = pygame.image.load('./img/blue_bug.png')
+    elif ID == 7:
+        image = pygame.image.load('./img/cyan_bug.png')
+    elif ID == 8:
+        image = pygame.image.load('./img/yellow_bug.png')
+    elif ID == 9:
         image = pygame.image.load('./img/bug.png')
     else:
-        return build_image_wireframe(pos,rad,ID)
+        return build_image_wireframe(pos,rad,4)
 
     # Scale the image to fit the size of the sprite
     image = pygame.transform.scale(image, (rad*2, rad*2))
-
-    # Draw team colours
-    #color = id2vec[ID]*255
-    #pygame.draw.circle(image, color, (rad,rad), rad, 1 )
 
     rect=image.get_rect(center=pos)
     return rect, image
@@ -129,8 +135,8 @@ def build_image_png(pos,rad,ID):
 def build_map_wireframe(size,N_COLS,N_ROWS,GRID_SIZE,terrain):
     '''
         Build a black map, with a different color for the terrain.
-        N.B.: THIS FUNCTION IS PROBABLY BROKEN AT THE MOMENT, BUT IT'S NOT USED BY DEFAULT ANYWAY.
     '''
+    # DEPRECATED
     COLOR_BROWN  = (250, 250, 20)
     background = pygame.Surface(size)
     background.fill([0, 0, 0])                  # fill with black
@@ -144,11 +150,18 @@ def build_map_wireframe(size,N_COLS,N_ROWS,GRID_SIZE,terrain):
 
 def build_map_png(size,N_COLS,N_ROWS,GRID_SIZE,tile_codes):
     '''
-        Build the map of N_COLS * N_ROWS squares of size GRID_SIZE with images based on the tile_codes array. 
-        Return the image, and the terrain map (indicating with 1s which gridsquares are unpassable).
+        Build the map.
 
-        N.B. A tile image covers 4 game tiles, therefore we only need to draw for every other row and column.
-        - but this does mean that maps need to be an even number of columns and rows!
+        Build the map of N_COLS * N_ROWS squares of size GRID_SIZE.
+        Images are based on the tile_codes array. 
+
+        Return 
+            - the image, and 
+            - the terrain map (where 1 = gridsquare unpassable).
+
+        Note: A tile image covers 4 game tiles, therefore we only need to draw 
+        for every other row and column. However, this does mean that maps need 
+        to be an even number of columns and rows!
     '''
     # Init.
     background = pygame.Surface(size)
@@ -164,6 +177,8 @@ def build_map_png(size,N_COLS,N_ROWS,GRID_SIZE,tile_codes):
             if c != '.':
                 (x,y) = choice(land[c])
                 image = sheet.subsurface((x*128,y*128,128,128))
+                if c == '&':
+                    image = rotate(image,90)
                 #img = pygame.transform.scale(img, (GRID_SIZE, GRID_SIZE))
                 background.blit(image, (j*GRID_SIZE, k*GRID_SIZE))
                 terrain[k:k+2,j:j+2] = terr[c]
