@@ -94,7 +94,7 @@ class World:
         # Some animate creatures
         for i in range(int(self.N_ROWS*FACTOR/4*2)):
             c = random.choice(len(agents))
-            Creature((self.random_position()), dna = agents[c], ID=4+c)
+            Creature((self.random_position()), dna = list(agents)[c], ID=4+c)
 
         self.allSprites.clear(self.screen, background)
 
@@ -228,9 +228,9 @@ class World:
     def random_position(self, on_empty=False):
         ''' Find a random position somewhere on the screen over land tiles
             (if specified -- only on an empty tile) '''
-        j_list = range(self.terrain.shape[0])
+        j_list = list(range(self.terrain.shape[0]))
         random.shuffle(j_list)
-        k_list = range(self.terrain.shape[1])
+        k_list = list(range(self.terrain.shape[1]))
         random.shuffle(k_list)
         for j in j_list:
             for k in k_list:
