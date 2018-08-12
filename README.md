@@ -1,9 +1,9 @@
-BugWorld / ALife V0.45a
+ALife (BugWorld) V0.50a
 =======================
 
 An 'artificial life' project in a simple 2D world, where emergent behaviour can arise. Unlike many similar, the creatures (they are *bugs*) here do not rely entirely on evolution to improve their behaviour generation-by-generation but use *reinforcement learning* in order to learn useful behaviours by experiences within one generation.
 
-![Screenshot](screenshot.png "Screenshot")
+![Screenshot](./docs/imgs/screenshot_v050.png "Screenshot")
 
 
 <!--
@@ -22,8 +22,8 @@ There are plants, herbivores, predators, and rocks. The terrain is either sand, 
 Requirements
 ------------
 	
-* pygame - http://pygame.org/ 
-* numpy - http://www.numpy.org/
+* [pygame](http://pygame.org/)
+* [numpy](http://www.numpy.org)
 
 
 Getting Started
@@ -41,30 +41,33 @@ You can load a particual map with some initial sprites,
 	python ALife.py dat/maps/map_islands2.dat 5
 ```
 
-There are some maps in `./dat/maps/` which can be edited by hand in the text file. The number indicates the density of objects to be spawned on startup; 0 is none, 8 is a lot.
+<!-- There are some maps in `./dat/maps/` which can be edited by hand in the text file. --> 
+The number indicates the density of objects to be spawned on startup; 0 is none, 10 is a lot.
 
 No interaction is required. But you may select an agent by clicking on it and thus viewing info (sensors, energy level, etc.) Also, the following keys are available:
 
-* <kbd>g</kbd> -	Toggle graphics (turn animation off for faster iterations, i.e., fast-forward)
 * <kbd>1</kbd> -	Add a new 'rock' (under the mouse pointer)
 * <kbd>3</kbd> -	Add a new 'plant' (under the mouse pointer)
-* <kbd>4</kbd> -	Add a new 'bug' (under the mouse pointer) team 1
-* <kbd>5</kbd> -	... team 2
-* <kbd>6</kbd> -	... team 3
-* <kbd>7</kbd> -	... team 4
-* <kbd>8</kbd> -	... team 5
-* <kbd>9</kbd> -	... team 6
-* <kbd>s</kbd> -	Save the agent of the currently selected bug  <!-- ('./dat/dna/')-->
-* <kbd>l</kbd> -	Load creatures currently saved on disk <!-- ('./dat/dna/')-->
+* <kbd>4</kbd> -	Add a new 'bug' (under the mouse pointer) agent type/team 1
+* <kbd>5</kbd> -	... agent type/team 2
+* <kbd>6</kbd> -	... agent type/team 3
+* <kbd>7</kbd> -	... agent type/team 4
+* <kbd>8</kbd> -	... agent type/team 5
+* <kbd>9</kbd> -	... agent type/team 6
+<!-- * <kbd>s</kbd> -	Save the agent of the currently selected bug -->  <!-- ('./dat/dna/')-->
+<!-- * <kbd>l</kbd> -	Load creatures currently saved on disk --> <!-- ('./dat/dna/')-->
+
+* <kbd>&uarr;</kbd> - Move the selected bug forward
+* <kbd>&rarr;</kbd> - Turn the selected bug right
+* <kbd>&larr;</kbd> - Turn the selected bug left
+
+<!-- * <kbd>&darr;</kbd> - Less energy input to the environment (less plant growth) -->
+* <kbd>g</kbd> -	Toggle graphics (turn animation off for faster iterations, i.e., fast-forward)
 * <kbd>d</kbd> -	Toggle grid (for debugging)
 * <kbd>.</kbd> - More energy input to the environment (more plant growth)
 * <kbd>,</kbd> - Less energy input to the environment (less plant growth)
 * <kbd>-</kbd> - More frames per second
 * <kbd>+</kbd> - Fewer frames per second
-* <kbd>&uarr;</kbd> - Move the selected bug forward
-<!-- * <kbd>&darr;</kbd> - Less energy input to the environment (less plant growth) -->
-* <kbd>&rarr;</kbd> - Turn the selected bug right
-* <kbd>&larr;</kbd> - Turn the selected bug left
 
 The bugs are animate agents, where input is in the form of three proximity sensors (two on each antennae plus the body as a third sensor) of three values each (representing RGB intensity) plus a value for the current energy level. All range between 0 and 1. Two output actions indicate angle and speed. 
 
@@ -74,15 +77,15 @@ Under the bugs' 'vision' other bugs of the same team/species are blue, bugs from
 
 This is illustrated in the following examples. Note that the colours get brighter and duller depend ending on proximity, and mix when more than one object is in the detection range (shown by the circles) for a particular sensor. The white bar represents the energy level.
 
-![Screenshot](bug5.png "Screenshot")
+![Screenshot](./docs/imgs/bug5.png "Screenshot")
 <!-- ![Screenshot](selected2.png "Screenshot") -->
-![Screenshot](bug6.png "Screenshot")
-![Screenshot](bug1.png "Screenshot")
+![Screenshot](./docs/imgs/bug6.png "Screenshot")
+![Screenshot](./docs/imgs/bug1.png "Screenshot")
 <!-- ![Screenshot](selected4.png "Screenshot") -->
-![Screenshot](bug3.png "Screenshot")
-![Screenshot](bug7.png "Screenshot")
-![Screenshot](bug8.png "Screenshot")
-![Screenshot](bug9.png "Screenshot")
+![Screenshot](./docs/imgs/bug3.png "Screenshot")
+![Screenshot](./docs/imgs/bug7.png "Screenshot")
+![Screenshot](./docs/imgs/bug8.png "Screenshot")
+![Screenshot](./docs/imgs/bug9.png "Screenshot")
 
 ### Output
 
@@ -101,6 +104,24 @@ Implementing New Agents
 Add the path and classname of your agents to the `bugs` section in `conf.yml`. The agent should be in a class of similar style to [AIGym](https://gym.openai.com/docs/) and needs `__init__` and `act` functions of the same style. Examples are given in `./alife/rl/evolution.py`. In this world, creatures also have a `spawn_copy` function which details how to copy itself when a bug reproduces (i.e., an evolutionary component). Even in non-evolutionary algorithms, this function can be used to add a variation to the hyper-parameters, and pass on existing knowledge.
 
 If multiple agents are defined, multiple agents will be spawned randomly at the beginning. The more suited agents should eventually out-compete the others and be the only ones remaining, therefore it can be used to test different reinforcement learning algorithms against each other.
+
+
+
+Using ALife Agents/Functions
+----------------------------
+
+You can install, with, e.g., 
+
+	python3 setup.py develop
+
+
+Known Bugs
+----------
+
+(Software bugs, not the bugs in the environment!)
+
+* For some reason, on some systems with `python3` there is a long pause after the click when selecting a bug with the mouse pointer. 
+* On some systems `python3` uses 100% CPU (when `python2` does not)
 
 
 Related Projects

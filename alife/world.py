@@ -15,7 +15,6 @@ TILE_SIZE = 64               # tile size (width and height, in pixels)
 MAX_GRID_DETECTION = 100     # maximum number of objects that can be detected at once
 
 class DrawGroup(pygame.sprite.Group):
-    # TODO -- need this ?
     def draw(self, surface):
         for s in self.sprites():
             s.draw(surface)
@@ -59,6 +58,7 @@ class World:
         ## INIT ##
         pygame.display.set_caption("ALife / Bug World")
         self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT))#, HWSURFACE|DOUBLEBUF)
+        #scroll_offset = array([0, 0])
         pygame.mouse.set_visible(1)
 
         ## BACKGROUND ##
@@ -126,10 +126,18 @@ class World:
                         GRAPHICS_ON = (GRAPHICS_ON != True)
                     elif event.key == pygame.K_d:
                         GRID_ON = (GRID_ON != True)
+                    #elif event.key == pygame.K_e:
+                    #    # TEST
+                    #    scroll_offset = scroll_offset - TILE_SIZE
+                    #    self.screen.blit(background, [0, 0])
+                    #elif event.key == pygame.K_u:
+                    #    # TEST
+                    #    scroll_offset = scroll_offset + TILE_SIZE
+                    #    self.screen.blit(background, [0, 0])
                     elif event.key == pygame.K_s and sel_obj is not None:
                         # TODO FIX
                         print("[Error] Functionality currently broken ...")
-                        #sel_obj.brain.save("./dat/dna/", "./dat/log/", sel_obj.ID)
+                        sel_obj.brain.save("./dat/dna/", "./dat/log/")
                     elif event.key == pygame.K_l:
                         # TODO FIX
                         print("[Error] Functionality currently broken ...")
@@ -143,16 +151,16 @@ class World:
                         #    print("Loaded Creature ID=%d from %s ..." % (params[3],filename))
                         #    Creature(array(pygame.mouse.get_pos()+random.randn(2)*TILE_SIZE),dna=brain, energy = params[0], ID = params[3])
                     elif event.key == pygame.K_PLUS:
-                        self.FPS = self.FPS - 10
+                        self.FPS = self.FPS + 50
                         print("FPS: %d" % self.FPS)
                     elif event.key == pygame.K_MINUS:
-                        self.FPS = self.FPS + 10
+                        self.FPS = self.FPS - 50
                         print("FPS: %d" % self.FPS)
                     elif event.key == pygame.K_COMMA:
-                        growth_rate = growth_rate + 10
+                        growth_rate = growth_rate + 100
                         print("Lower energy influx (new plant every %d ticks)" % growth_rate)
                     elif event.key == pygame.K_PERIOD:
-                        growth_rate = growth_rate - 10
+                        growth_rate = growth_rate - 100
                         print("Higher energy influx (new plant every %d ticks)" % growth_rate)
                     elif event.key == pygame.K_1:
                         print("New Rock")
@@ -206,7 +214,8 @@ class World:
                 # Update sprites
                 self.allSprites.update()
                 # Draw the background
-                self.screen.blit(background, [0, 0])
+                # @TODO redraw only the visible/active tiles; the ones with moving sprites ontop of them
+                self.screen.blit(background, [0,0]) #[scroll_offset[0], scroll_offset[1], scroll_offset[0] + 100, scroll_offset[1] + 100])
                 # Draw the grid
                 if GRID_ON:
                     # GRID ON
@@ -215,6 +224,7 @@ class World:
                     for l in range(0,self.N_COLS*TILE_SIZE,TILE_SIZE):
                         pygame.draw.line(self.screen, COLOR_WHITE, [l, 0], [l,SCREEN[1]], 1)
                 # Draw the sprites
+                # @TODO draw only the dirty sprites (the ones that have moved since last time)
                 rects = self.allSprites.draw(self.screen)
                 # Draw the selected sprite
                 if sel_obj is not None:
@@ -237,7 +247,8 @@ class World:
                 if not (self.terrain[j,k] > 0) and not (self.regcount[k,j] > 0 and on_empty):
                     return self.grid2pos((k,j)) + random.rand(2) * TILE_SIZE - TILE_SIZE*0.5
         # There are no empty tiles
-        return None
+        print("Warning: No empty tiles to place stuff on")
+        return random_position(self, on_empty=True)
 
     def grid2pos(self,grid_square):
         ''' Grid reference to point (mid-point of the grid-square) '''

@@ -16,9 +16,6 @@ objects:
     init_energy : 1.0
     touch_threshold : 0.9    # after this level is considered touch
     divide_limit : 2.0
-bugs: 
-    1 : alife.agents.evolution:Evolver
-    2 : alife.agents.evolution:MLP
-    3 : alife.agents.evolution:ESN
-#    4 : alife.agents.sarsa:Sarsa
-#    5 : alife.agents.hill_climbing:SimpleHillClimber
+bugs: # todo, include 1 and 2 for rock, plant, etc. 
+    1 : alife.agents.evolution/SimpleEvolver/{'H':10}
+    2 : alife.agents.evolution/SimpleEvolver/{'H':-10}

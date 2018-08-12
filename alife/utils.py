@@ -1,11 +1,6 @@
 from numpy import *
 from numpy.linalg import norm
 
-def proximity(p1, p2):
-    ''' proximity (Euclidean distance)'''
-    # DEPRECATED
-    return norm(p1 - p2)
-
 def collision(p1, r1, p2, r2):
     ''' 
     Returns collision information from circle (p1,r1) with circle (p2,r2). 
@@ -17,11 +12,8 @@ def collision(p1, r1, p2, r2):
     # The length between the objects
     d = max(norm(v_diff),0.01)
 
-    # The length sum of the two radii
-    r = (r1 + r2)
-
-    # Calculate the overlap
-    overlap = r - d 
+    # Calculate the overlap (sum of radii - distance between centers)
+    overlap = (r1 + r2) - d 
 
     return v_diff, overlap, d
 
@@ -43,7 +35,7 @@ def slide_apart(obj_1,obj_2):
     if overlap > 0:
         # ... slide them apart 
         u = v_diff / d
-        velocity = u * overlap/1.9
+        velocity = u * overlap/1.9 + 1.
         obj_1.pos = obj_1.pos + velocity
         obj_2.pos = obj_2.pos - velocity
 

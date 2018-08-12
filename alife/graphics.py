@@ -63,34 +63,52 @@ trees = [
 
 land = {
         # Denotes the location of each tile given its character code
-        ' ' : [(0,0)],
-        'v' : [(4,7),(5,7),(4,5),(5,5),(6,4)],
-        '[' : [(3,3),(3,5),(6,2),(4,2)],
-        ']' : [(5,1),(1,1),(2,1),(1,5),(1,7)],
-       '\\' : [(7,5)],
-        '/' : [(7,3)],
-        '+' : [(5,3)],
-        '^' : [(2,0),(4,0)],
-        'L' : [(2,5)],
-        '&' : [(3,7)],
-        '-' : [(2,7)],
-        '~' : [(7,7)],
+        ' ' : [(0,0)],                                   # land
+        'v' : [(4,7),(5,7),(4,5),(5,5),(6,4)],           # top ridge
+        '^' : [(2,0),(4,0)],                             # bottom ridge
+        '[' : [(3,3),(3,5),(6,2),(4,2)],                 # left ridge
+        ']' : [(5,1),(1,1),(2,1),(1,5),(1,7)],           # right ridge
+       '\\' : [(7,5)],                                   # bottom left ridge
+        '/' : [(7,3)],                                   # bottom right ridge
+        '+' : [(5,3)],                                   # top left ridge
+        'L' : [(2,5)],                                   # top right ridge
+        '&' : [(3,7)],                                   # bottom left concave (after rotation 90 deg)
+        'D' : [(3,7)],                                   # top left concave 
+        'C' : [(2,3)],                                   # top right concave
+        '-' : [(2,7)],                                   # bottom right concave
+        '~' : [(7,7)],                                   # water
     }
 
 terr = {
         # Denotes the collision quaters of each tile given its character code (since one picture tile covers 4 game tiles)
-        ' ' : array([[0,0],[0,0]]),
-        'v' : array([[0,0],[1,1]]), 
-        '[' : array([[1,0],[1,0]]),                       
-        ']' : array([[0,1],[0,1]]),                       
-       '\\' : array([[1,0],[1,1]]),                       
-        '/' : array([[0,1],[1,1]]),                       
-        '+' : array([[1,1],[1,0]]),                       
-        '^' : array([[1,1],[0,0]]),                       
-        'L' : array([[1,1],[0,1]]),                       
-        '&' : array([[0,0],[1,0]]),                       
-        '-' : array([[0,0],[0,0]]),                       
-        '~' : array([[1,1],[1,1]]),                       
+        ' ' : array([[0,0],
+                     [0,0]]),
+        'v' : array([[0,0],
+                     [1,1]]), 
+        '[' : array([[1,0],
+                     [1,0]]),                       
+        ']' : array([[0,1],
+                     [0,1]]),                       
+       '\\' : array([[1,0],
+                     [1,1]]),                       
+        '/' : array([[0,1],
+                     [1,1]]),                       
+        '+' : array([[1,1],
+                     [1,0]]),                       
+        '^' : array([[1,1],
+                     [0,0]]),                       
+        'L' : array([[1,1],
+                     [0,1]]),                       
+        'C' : array([[0,0],     # <-- top right is soft
+                     [0,0]]),                       
+        'D' : array([[0,0],     # <-- top left is soft
+                     [0,0]]),                       
+        '&' : array([[0,0],     # <-- bottom left is soft
+                     [0,0]]),                       
+        '-' : array([[0,0],     # <-- bottom right is soft
+                     [0,0]]),    
+        '~' : array([[1,1],
+                     [1,1]]),                       
     }
 
 def get_tree(n):
@@ -109,20 +127,12 @@ def build_image_png(pos,rad,ID):
     '''
     if ID == 1:
         image = get_rock(random.choice(10))
+    elif ID == 2:
+        print("No such object type")
     elif ID == 3:
         image = get_tree(random.choice(len(trees)))
-    elif ID == 4:
-        image = pygame.image.load('./img/green_bug.png')
-    elif ID == 5:
-        image = pygame.image.load('./img/red_bug.png')
-    elif ID == 6:
-        image = pygame.image.load('./img/blue_bug.png')
-    elif ID == 7:
-        image = pygame.image.load('./img/cyan_bug.png')
-    elif ID == 8:
-        image = pygame.image.load('./img/yellow_bug.png')
-    elif ID == 9:
-        image = pygame.image.load('./img/bug.png')
+    elif ID >= 4 and ID <= 11:
+        image = pygame.image.load('./img/green_bug_m%d.png' % (ID-3)).convert_alpha()
     else:
         return build_image_wireframe(pos,rad,4)
 
@@ -167,11 +177,11 @@ def build_map_png(size,N_COLS,N_ROWS,GRID_SIZE,tile_codes):
     background = pygame.Surface(size)
     terrain = zeros((N_ROWS,N_COLS),dtype=int)
     # Load.
-    sheet = pygame.image.load('./img/ground.png') #.convert_alpha()
+    sheet = pygame.image.load('./img/ground.png').convert_alpha()
     # Draw
     for j in range(0,N_COLS,2):
         for k in range(0,N_ROWS,2):
-            bgimg = pygame.image.load('./img/water.png')
+            bgimg = pygame.image.load('./img/water.png').convert()
             background.blit(bgimg, (j*GRID_SIZE, k*GRID_SIZE))
             c = tile_codes[k,j]
             if c != '.':
@@ -184,3 +194,11 @@ def build_map_png(size,N_COLS,N_ROWS,GRID_SIZE,tile_codes):
                 terrain[k:k+2,j:j+2] = terr[c]
     background = background.convert()           # can speed up when we have an 'intense' background
     return background, terrain
+
+def rebuild_map(background, tile_codes):
+    '''
+        Rebuild the dirty parts of the map, as indicated in tile_codes. 
+        (This should be faster than repainting the whole thing). 
+    '''
+    #TODO
+    return

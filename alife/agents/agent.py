@@ -4,7 +4,7 @@ import pickle
 import string
 from copy import copy
 
-class Agent():
+class Agent(object):
 
     id_num = 0
 
@@ -68,7 +68,7 @@ class Agent():
         '''
         raise NotImplementedError
 
-    def spawn_copy(self):
+    def copy(self):
         """
             Spawn.
 

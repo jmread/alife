@@ -44,7 +44,7 @@ FLIGHT_BOOST = cfg['flight_boost']     # Speed is multiplied by this factor if i
 DIVIDE_LIMIT = cfg['divide_limit']     # Divide when at this proportion of energy
 INIT_ENERGY = cfg['init_energy']       # How much of its max energy is a creature born with
 BITE_RATIO = cfg['bite_ratio']         #
-MIN_ATTACK_ANGLE = pi/2.               # Minimum attack angle 
+MIN_ATTACK_ANGLE = pi                  # Minimum attack angle 
 
 def burn(angle,speed,size):
     '''
@@ -64,11 +64,13 @@ class Thing(pygame.sprite.DirtySprite):
         self.radius = 3 + int(math.sqrt(mass/math.pi))
         self.energy = mass
         self.pos = pos
-        self.dirty = True
+        self.is_colliding = True
         self.rect, self.image = build_image(self.pos,self.radius,self.ID)
 
     def wrap(self,world):
-        ''' wrap objects around the screen '''
+        ''' wrap objects around the screen 
+            (assume this object has valid 'pos' coordinates)
+        '''
         if self.pos[0] >= world.WIDTH:
             self.pos[0] = 1.
         elif self.pos[0] < 0 :
@@ -97,7 +99,7 @@ class Thing(pygame.sprite.DirtySprite):
             self.kill()
             return
 
-        while self.dirty:
+        while self.is_colliding:
             # Check for overlap with objects / terrain (if we are a rock or plant; else it is handled elsewhere)
             color,collision_obj,terrain_centre = world.collision_to_vision(self.pos,self.radius,self)
             if terrain_centre is not None:
@@ -107,11 +109,11 @@ class Thing(pygame.sprite.DirtySprite):
                 # If it's an inanimate object (rock or plant) ..
                 if collision_obj.ID <= ID_PLANT:
                     slide_apart(self, collision_obj)
-                    collision_obj.dirty = True
+                    collision_obj.is_colliding = True
                 else:
-                    self.dirty = False
+                    self.is_colliding = False
             else:
-                self.dirty = False
+                self.is_colliding = False
             # Wrap
             self.wrap(world)
         return
@@ -133,7 +135,7 @@ class Thing(pygame.sprite.DirtySprite):
         # Bump !
         self.pos = self.pos + (creature.unitv * creature.speed)
         slide_apart(creature,self)
-        self.dirty = True
+        self.is_colliding = True
 
 
     def kill(self): # necessary?
@@ -141,13 +143,16 @@ class Thing(pygame.sprite.DirtySprite):
         self.remove()
         self = None
 
-def spawn_agent(agent_def="alife.rl.evolution:Evolver"):
+def spawn_agent(agent_def=None):
     ''' 
         Spawn a new creature and give it an agent.
     '''
-    mod_str,cls_str = agent_def.split(":")
+    mod_str,cls_str,arg_str = agent_def.split("/")
     import importlib
     Agent = getattr(importlib.import_module(mod_str), cls_str)
+    kwargs = eval(arg_str)
+    if len(kwargs) > 0:
+        return Agent(observ_space, action_space, **kwargs)
     return Agent(observ_space, action_space)
 
 
@@ -176,7 +181,7 @@ class Creature(Thing):
             print("Error: No Agent definition given.")
             exit(1)
         else: # isinstance(dna, Agent):
-            self.brain = dna.spawn_copy()
+            self.brain = dna.copy()
 
     def __str__(self):
         return str(self.brain)
@@ -331,7 +336,7 @@ class Creature(Thing):
         """
         s = str(self)
         anchor = 1
-        pygame.draw.rect(surface, COLOR_BLACK, (anchor,5,anchor+17*len(s),25))
+        pygame.draw.rect(surface, COLOR_BLACK, (anchor,5,anchor+20*len(s),25))
         myfont = pygame.font.SysFont("monospace", 17)
         label = myfont.render(s, 1, COLOR_WHITE)
         surface.blit(label, [anchor+1,6])
