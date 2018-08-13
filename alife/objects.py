@@ -28,7 +28,7 @@ observ_space = BugSpace(0.,1.,(N_INPUTS,))
 IDX_ANGLE = 0
 IDX_SPEED = 1
 N_OUTPUTS = 2
-action_space = BugSpace(array([-pi/4., 0.]), array([pi/4.,10.]))
+action_space = BugSpace(array([-pi/4., -5.]), array([pi/4.,10.]))
 
 # Load game constants
 
@@ -188,7 +188,6 @@ class Creature(Thing):
 
     def move(self):
         ''' Move '''
-        self.pos = self.pos + self.unitv * self.speed
 
     def hit_by(self, being):
         '''
@@ -300,7 +299,7 @@ class Creature(Thing):
         self.pa2 = rotate(self.unitv * self.radius*3,-0.3) # antenna right pos
         # Now move (this burns energy according to size and speed and the angle of turn)
         self.energy = self.energy - burn(angle, speed, self.radius)
-        self.move();
+        self.pos = self.pos + self.unitv * self.speed
         # Divide (if we are DIVIDE_LIMIT times over the limit)
         if self.energy > (self.energy_limit * DIVIDE_LIMIT):
             # Pass on half of spare energy to the child

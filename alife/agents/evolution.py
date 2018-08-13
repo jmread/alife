@@ -22,7 +22,6 @@ class SimpleEvolver(Agent):
         """
             Init.
 
-
             Parameters
             ----------
 
@@ -30,10 +29,8 @@ class SimpleEvolver(Agent):
                 observation space
             act_space : BugSpace
                 action space
-            m_type : str
+            H : int
                 number of hidden units (negative for recurrent)
-            dat_file : str
-                data folder to select 'brains' from
 
         """
         self.obs_space = obs_space
@@ -41,8 +38,6 @@ class SimpleEvolver(Agent):
 
         D = obs_space.shape[0]
         L = act_space.shape[0]
-
-        H = 0
 
         if 'H' in kwargs:
             H = kwargs['H']
@@ -80,7 +75,7 @@ class SimpleEvolver(Agent):
 
     def copy(self):
         """
-            Spawn.
+            Copy.
             
             A new copy (child) of this agent, [optionally] based on this one (the parent).
         """

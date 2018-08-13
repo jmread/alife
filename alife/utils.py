@@ -45,7 +45,7 @@ def slide_off(s,p,min_dist=5.):
     # TODO - calculate the exact distance required to move it
     s.speed = max(min_dist,s.speed)
     s.unitv = unitv(s.pos - p)
-    s.move()
+    s.pos = s.pos + s.unitv * s.speed
 
 def rotate(v, theta=0.1):
     ''' rotation vector v by angle theta '''

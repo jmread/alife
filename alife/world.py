@@ -85,7 +85,7 @@ class World:
         FACTOR = init_sprites
         for i in range(int(self.N_ROWS*((FACTOR/2)**2))):
             Thing(self.random_position(), mass=100+random.rand()*1000, ID=ID_ROCK)
-        for i in range(int(self.N_ROWS*((FACTOR)**2))):
+        for i in range(int(self.N_ROWS*((FACTOR/2)**2))):
             Thing(self.random_position(), mass=100+random.rand()*cfg['max_plant_size'], ID=ID_PLANT)
 
         # Get a list of the agents we may deploy 
@@ -117,6 +117,8 @@ class World:
                         # Human intervention in selected agent
                         if event.key == pygame.K_UP:
                             sel_obj.selected = array([-0.0,3.])
+                        elif event.key == pygame.K_DOWN:
+                            sel_obj.selected = array([-0.0,5.1])
                         if event.key == pygame.K_RIGHT:
                             sel_obj.selected = array([0.1,0.])
                         elif event.key == pygame.K_LEFT:
