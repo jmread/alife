@@ -48,7 +48,7 @@ class World:
         SCREEN = array([self.WIDTH, self.HEIGHT])
 
         step = 0
-        growth_rate = 200
+        growth_rate = cfg['growth_rate']
 
         ## GRID REGISTER and GRID COUNT 
         self.register = [[[None for l in range(MAX_GRID_DETECTION)] for k in range(self.N_ROWS)] for j in range(self.N_COLS)]
@@ -80,21 +80,22 @@ class World:
         Thing.containers = self.allSprites, self.plants
 
         self.clock = pygame.time.Clock()
+        banner = get_banner("Start")
         
         # Some rocks and plants
         FACTOR = init_sprites
-        for i in range(int(self.N_ROWS*((FACTOR/2)**2))):
+        for i in range(int(self.N_ROWS*FACTOR/10*self.N_COLS)):
             Thing(self.random_position(), mass=100+random.rand()*1000, ID=ID_ROCK)
-        for i in range(int(self.N_ROWS*((FACTOR/2)**2))):
+        for i in range(int(self.N_ROWS*FACTOR/10*self.N_COLS)):
             Thing(self.random_position(), mass=100+random.rand()*cfg['max_plant_size'], ID=ID_PLANT)
 
         # Get a list of the agents we may deploy 
         agents = get_conf(section='bugs').values()
 
         # Some animate creatures
-        for i in range(int(self.N_ROWS*FACTOR/4*2)):
+        for i in range(int(self.N_ROWS*FACTOR/10*self.N_COLS)):
             c = random.choice(len(agents))
-            Creature((self.random_position()), dna = list(agents)[c], ID=4+c)
+            Creature(self.random_position(), dna = list(agents)[c], ID=4+c)
 
         self.allSprites.clear(self.screen, background)
 
@@ -123,7 +124,7 @@ class World:
                             sel_obj.selected = array([0.1,0.])
                         elif event.key == pygame.K_LEFT:
                             sel_obj.selected = array([-0.1,0.])
-                        # TODO Restore control to agent later
+                        # TODO Restore control to RL agent later
                     if event.key == pygame.K_g:
                         GRAPHICS_ON = (GRAPHICS_ON != True)
                     elif event.key == pygame.K_d:
@@ -162,7 +163,7 @@ class World:
                         growth_rate = growth_rate + 100
                         print("Lower energy influx (new plant every %d ticks)" % growth_rate)
                     elif event.key == pygame.K_PERIOD:
-                        growth_rate = growth_rate - 100
+                        growth_rate = max(growth_rate - 100,10)
                         print("Higher energy influx (new plant every %d ticks)" % growth_rate)
                     elif event.key == pygame.K_1:
                         print("New Rock")
@@ -196,10 +197,11 @@ class World:
 
             # Make sure there is a constant flow of resources/energy into the system
             step = step + 1
-            if step % growth_rate == 0 and len(self.plants):
+            if step % growth_rate == 0:
                 p = self.random_position()
-                if p is not None:
+                if p is not None and len(self.plants) < 100:
                     Thing(p, mass=100+random.rand()*cfg['max_plant_size'], ID=ID_PLANT)
+                banner = get_banner("t=%d; %d bugs" % (step,len(self.creatures)))
                 print("Time step %d; %d bugs alive" % (step,len(self.creatures)))
 
             # Reset reg-counts and Register all sprites
@@ -220,6 +222,7 @@ class World:
                 self.screen.blit(background, [0,0]) #[scroll_offset[0], scroll_offset[1], scroll_offset[0] + 100, scroll_offset[1] + 100])
                 # Draw the grid
                 if GRID_ON:
+                    self.screen.blit(banner,[10,10])
                     # GRID ON
                     for l in range(0,self.N_ROWS*TILE_SIZE,TILE_SIZE):
                         pygame.draw.line(self.screen, COLOR_WHITE, [0, l], [SCREEN[0],l], 1)
@@ -250,7 +253,7 @@ class World:
                     return self.grid2pos((k,j)) + random.rand(2) * TILE_SIZE - TILE_SIZE*0.5
         # There are no empty tiles
         print("Warning: No empty tiles to place stuff on")
-        return random_position(self, on_empty=True)
+        return self.random_position(on_empty=False)
 
     def grid2pos(self,grid_square):
         ''' Grid reference to point (mid-point of the grid-square) '''

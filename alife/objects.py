@@ -4,6 +4,7 @@ from pygame.locals import *
 from utils import *
 from graphics import build_image_png as build_image, build_image_bank
 from graphics import rgb2color, id2rgb, COLOR_BLACK, COLOR_WHITE
+from graphics import draw_banner
 from agents.spaces import BugSpace # the space of the environment (for the agent)
 from agents.agent import Agent 
 set_printoptions(precision=4)
@@ -199,26 +200,21 @@ class Creature(Thing):
             return
 
         elif self.ID == being.ID:
-            # The being is from the same species (TODO: add reproduction option here)
+            # The being is from the same species
             self.energy = self.energy - being.speed * BOUNCE_DAMAGE   # Ouch!
             being.energy = being.energy - being.speed * BOUNCE_DAMAGE  # Ouch!
             slide_apart(self,being)
 
         else:
-            # We must fight!
-
-
+            # Fight!
             obj = [self,being]
             theta = angles_of_attack(self,being)
-
-            #print("ANGLES OF ATTACK", self.ID, theta)
-
             for i in [0,1]:
                 j = (i+1) % 2
                 r = random.rand()
                 if r > (theta[i] / MIN_ATTACK_ANGLE): 
                     # Attack succeeded
-                    bite = r * obj[i].speed * 100. * BITE_RATIO
+                    bite = r * obj[i].speed * 200. * BITE_RATIO
                     obj[i].energy = obj[i].energy + bite
                     obj[j].energy = obj[j].energy - bite
                 else:
@@ -333,12 +329,7 @@ class Creature(Thing):
         """
             Additional drawing if this object is selected
         """
-        s = str(self)
-        anchor = 1
-        pygame.draw.rect(surface, COLOR_BLACK, (anchor,5,anchor+20*len(s),25))
-        myfont = pygame.font.SysFont("monospace", 17)
-        label = myfont.render(s, 1, COLOR_WHITE)
-        surface.blit(label, [anchor+1,6])
+        draw_banner(surface, str(self))
         # Body
         pygame.draw.circle(surface, rgb2color(self.observation[IDX_COLIDE],id2rgb[ID_ANIMAL]), (int(self.pos[0]),int(self.pos[1])), int(self.radius + 3), 4)
         # Rangers

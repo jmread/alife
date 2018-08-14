@@ -5,6 +5,7 @@ from numpy import *
 # PyGame colours
 COLOR_TRANSPARENT = (1,2,3)
 COLOR_WHITE  = (255, 255, 255)
+COLOR_RED  = (255, 0, 0)
 COLOR_BLACK  = (0, 0, 0)
 
 # RGB intensities given a sprite ID
@@ -142,22 +143,6 @@ def build_image_png(pos,rad,ID):
     rect=image.get_rect(center=pos)
     return rect, image
 
-def build_map_wireframe(size,N_COLS,N_ROWS,GRID_SIZE,terrain):
-    '''
-        Build a black map, with a different color for the terrain.
-    '''
-    # DEPRECATED
-    COLOR_BROWN  = (250, 250, 20)
-    background = pygame.Surface(size)
-    background.fill([0, 0, 0])                  # fill with black
-    for j in range(N_COLS):
-        for k in range(N_ROWS):
-            if terrain[k,j] > 0:
-                # Fill in the terrain
-                background.fill(COLOR_BROWN, rect=(j*GRID_SIZE,k*GRID_SIZE,GRID_SIZE,GRID_SIZE))
-    background = background.convert()           # can speed up when we have an 'intense' background
-    return background
-
 def build_map_png(size,N_COLS,N_ROWS,GRID_SIZE,tile_codes):
     '''
         Build the map.
@@ -202,3 +187,33 @@ def rebuild_map(background, tile_codes):
     '''
     #TODO
     return
+
+def get_banner(s):
+    image = pygame.Surface((300, 20))
+    image.fill(COLOR_TRANSPARENT)
+    image.set_colorkey(COLOR_TRANSPARENT)
+
+    myfont = pygame.font.SysFont("monospace", 17)
+    label = myfont.render(s, 1, COLOR_WHITE)
+    image.blit(label, [0,0])
+    return image
+
+def draw_banner(surface, s):
+    lines = s.split("\n")
+    #print(lines)
+    myfont = pygame.font.SysFont("monospace", 17)
+    l,h = myfont.size('--------------------')
+    pygame.draw.rect(surface, COLOR_BLACK, (1,1,1+l,1+h*len(lines)))
+    j = 0
+    color = COLOR_RED
+    for line in lines:
+        #print(j,line)
+        label = myfont.render(line, 1, color)
+        surface.blit(label, [1,h*j])
+        j = j + 1
+        color = COLOR_WHITE
+
+#from agents.evolution import SimpleEvolver 
+#a = SimpleEvolver(random.randn(2,1), random.randn(2,1), 3)
+#print(draw_banner(None,"%s \n (%s: G%d)" % ("5","5", 2)))
+#print(draw_banner(None,str(a)))

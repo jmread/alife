@@ -89,7 +89,7 @@ class SimpleEvolver(Agent):
 
     def __str__(self):
         ''' Return a string representation (e.g., a label) for this agent '''
-        return ("%s %s: G%d" % (str(self.h.__class__.__name__), self.id_num,self.generation))
+        return ("%s\nID:%s\nGen.%d" % (str(self.h.__class__.__name__), self.id_num,self.generation))
 
 #    def load(self, file_name):
 #        self.generation = 0 # TODO extract from filename
