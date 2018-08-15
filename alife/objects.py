@@ -296,6 +296,7 @@ class Creature(Thing):
         # Now move (this burns energy according to size and speed and the angle of turn)
         self.energy = self.energy - burn(angle, speed, self.radius)
         self.pos = self.pos + self.unitv * self.speed
+        self.speed = abs(self.speed)
         # Divide (if we are DIVIDE_LIMIT times over the limit)
         if self.energy > (self.energy_limit * DIVIDE_LIMIT):
             # Pass on half of spare energy to the child

@@ -86,16 +86,18 @@ class World:
         FACTOR = init_sprites
         for i in range(int(self.N_ROWS*FACTOR/10*self.N_COLS)):
             Thing(self.random_position(), mass=100+random.rand()*1000, ID=ID_ROCK)
-        for i in range(int(self.N_ROWS*FACTOR/10*self.N_COLS)):
+        for i in range(int(self.N_ROWS*FACTOR/5*self.N_COLS)):
             Thing(self.random_position(), mass=100+random.rand()*cfg['max_plant_size'], ID=ID_PLANT)
 
         # Get a list of the agents we may deploy 
         agents = get_conf(section='bugs').values()
 
         # Some animate creatures
-        for i in range(int(self.N_ROWS*FACTOR/10*self.N_COLS)):
-            c = random.choice(len(agents))
-            Creature(self.random_position(), dna = list(agents)[c], ID=4+c)
+        #for i in range(int(self.N_ROWS*FACTOR/10*self.N_COLS)):
+        for c in range(len(agents)):
+            p = self.random_position()
+            for i in range(FACTOR):
+                Creature(p + random.randn()*(TILE_SIZE/2), dna = list(agents)[c], ID=4+c)
 
         self.allSprites.clear(self.screen, background)
 
@@ -199,7 +201,7 @@ class World:
             step = step + 1
             if step % growth_rate == 0:
                 p = self.random_position()
-                if p is not None and len(self.plants) < 100:
+                if p is not None and len(self.plants) < 1000:
                     Thing(p, mass=100+random.rand()*cfg['max_plant_size'], ID=ID_PLANT)
                 banner = get_banner("t=%d; %d bugs" % (step,len(self.creatures)))
                 print("Time step %d; %d bugs alive" % (step,len(self.creatures)))
