@@ -25,13 +25,13 @@ class SimpleHillClimber():
             # continous action space
             n_actions = action_space.shape[0]
             self.stochastic_policy = False
+            print("[Info] Continuous action space; discrete policy")
         except:
             # discrete action space
             n_actions = action_space.n
             fo = sigmoid
             self.stochastic_policy = True
-
-            max_episode_length = 50 
+            print("[Info] Discrete action space; stochastic policy")
 
         # Max length of an episode 
         self.T = max_episode_length
@@ -169,7 +169,12 @@ class SimpleHillClimber():
             return np.argmax(y)
         else:
             # deterministic policy (suppose linear), clip the continuous action into range
-            return np.clip(y, self.act_space.low, self.act_space.high)
+            print("y", y)
+            print("clipped", self.act_space.low)
+            print("clipped", self.act_space.high)
+            a = np.clip(y, self.act_space.low, self.act_space.high)
+            print("a", a)
+            return a
 
         return y
 

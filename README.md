@@ -1,4 +1,4 @@
-ALife (BugWorld) V0.50a
+ALife (BugWorld) V0.60a
 =======================
 
 <!-- 

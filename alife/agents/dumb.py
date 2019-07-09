@@ -1,9 +1,9 @@
 #from alife.rl.agent import Agent
 import numpy as np
 
-class Dumb():
+class DumbAgent():
     '''
-        A dumb agent; does nothing.
+        A dumb agent; just takes random actions.
     '''
 
     def __init__(self, obs_space, act_space, **kwargs):
@@ -18,10 +18,13 @@ class Dumb():
                 observation space
             act_space : BugSpace
                 action space
+            **kwargs : additional arguments
 
         """
+
         self.obs_space = obs_space
         self.act_space = act_space
+
         self.name = "Fred"
         if 'name' in kwargs:
             self.name = kwargs['name']
@@ -29,7 +32,7 @@ class Dumb():
 
     def __str__(self):
         ''' Return a string representation (e.g., a label) for this agent '''
-        return ("Dumb Agent\nName: %s" % self.name)
+        return ("\nName: %s" % self.name)
 
     def act(self,obs,reward,done=False):
         """
@@ -38,19 +41,19 @@ class Dumb():
             Parameters
             ----------
 
-            obs : numpy array of length D
-                the state at the current time
+            obs : numpy array 
+                observation of the current state
             reward : float
-                the reward signal at the current time
+                the current reward recieved
+            done : 
+                True if the episode is over now
 
             Returns
             -------
 
-            A number array of length L 
-                (the action to take)
+            A random action to take
         """
 
-        n_actions = self.act_space.shape[0]
-        return np.zeros((n_actions))
+        return self.act_space.sample()
 
 

@@ -63,7 +63,7 @@ class SLP():
 
         if rand() < prob_reset:
             print("[Info] Reset")
-            self.reset()
+            self.reset(scaling=0.1)
 
         # Make a random adjustment to the weight matrix.
         self.W_io = self.W_io + alpha * randn(*self.W_io.shape) 

@@ -1,21 +1,16 @@
 import numpy as np
 np_random = np.random.RandomState()
 
-class BugSpace():
+class ContinuousBugSpace():
     """
-        Continous spaces in the form of numpy arrays.
+        A continous spaces determined by a numpy arrays.
         
-        Like the Box space in AIGym.
+        Like the Box space in gym.
     """
 
     def __init__(self, low, high, shape=None):
         """
             Create a space as vector shape.
-
-            Like Box, there are two kinds of input; e.g., 5 continuous values 
-            between 0 and 1 (inclusive):
-                BugSpace(0.0, 1.0, (3,))    
-                BugSpace(np.array([0.0,0.0,0.0]), np.array([1.0,1.0,1.0]))
         """
         if shape is None:
             assert low.shape == high.shape
@@ -32,18 +27,16 @@ class BugSpace():
         """
         return np_random.uniform(low=self.low, high=self.high, size=self.low.shape)
 
-    def contains(self, x):
-        """
-            Anything in R-space is OK.
-        """
-        #return isinstance(x, np.ndarray) and x.shape == (self.N,)
-        return x.shape == self.shape and (x >= self.low).all() and (x <= self.high).all()
-
     @property
     def shape(self):
         return self.low.shape
 
-#A = BugSpace(0.0, 1.0, (5,))
-#x = np.random.rand(5)
-#print(len(x))
-#print(A.contains(x))
+
+class DiscreteBugSpace():
+
+    def __init__(self, n):
+        assert n >= 0
+        self.n = n
+
+    def sample(self):
+        return np.random.choice(self.n)

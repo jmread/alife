@@ -5,9 +5,8 @@ from utils import *
 from graphics import build_image_png as build_image, build_image_bank, build_splatter_img
 from graphics import id2rgb, COLOR_BLACK, COLOR_WHITE#, COLOR_RED, COLOR_MAGENTA
 from graphics import draw_banner
-from agents.spaces import BugSpace # the space of the environment (for the agent)
-from agents.agent import Agent 
-set_printoptions(precision=4)
+from agents.spaces import ContinuousBugSpace, DiscreteBugSpace # the space of the environment (for the agent)
+np.set_printoptions(precision=4)
 
 # Types of Sprites/Things/Objects
 ID_VOID = 0
@@ -28,7 +27,7 @@ N_INPUTS = 11
 IDX_ANGLE = 0
 IDX_SPEED = 1
 N_OUTPUTS = 2
-action_space = BugSpace(array([-pi/4., -5.]), array([pi/4.,10.]))
+action_space = ContinuousBugSpace(np.array([-np.pi/4., -5.]), np.array([np.pi/4.,10.]))
 
 # Load game constants
 
@@ -46,10 +45,11 @@ INIT_ENERGY = cfg['init_energy']       # How much of its max energy is a creatur
 BITE_RATIO = cfg['bite_ratio']         #
 ANTENNA_RANGE = cfg['antenna_range']   #
 CARAPACE_RANGE = cfg['carapace_range'] #
-MIN_ATTACK_ANGLE = pi                  # Minimum attack angle 
+MIN_ATTACK_ANGLE = np.pi                  # Minimum attack angle 
 ALLOW_ATTACKS = False                  # Allow bugs to attack each other? N.B. If True then DO NOT use USE_GRAYSCALE_FILTER!
 USE_GRAYSCALE_FILTER = True            # Bugs are colorblind? It will make learning easier (smaller state space)
 DISTANCE_BETWEEN_CHECKPOINTS = 20
+DISCRETIZE_ACTION_SPACE = True
 
 def burn(angle,speed,size):
     '''
@@ -57,6 +57,7 @@ def burn(angle,speed,size):
     '''
     return max(1.,1.*abs(speed)+5.*abs(angle))**2 * (size / 1000.0)
 
+###############################################################################
 
 N_OBSERVATIONS = 4
 
@@ -66,14 +67,26 @@ def obs_filter(x):
     '''
     if not USE_GRAYSCALE_FILTER:
         return x
-    x_ = zeros(N_OBSERVATIONS)
+    x_ = np.zeros(N_OBSERVATIONS)
     x_[0] = max(x[IDX_COLIDE])
     x_[1] = max(x[IDX_PROBE1])
     x_[2] = max(x[IDX_PROBE2])
     x_[3] = x[IDX_FLAG]
     return x_
 
-observ_space = BugSpace(0.,1.,(N_OBSERVATIONS,))
+observ_space = ContinuousBugSpace(0.,1.,(N_OBSERVATIONS,))
+
+from agents.discretization import discrete2continuous
+
+def act_filter(a):
+    ''' filter the action space for discrete space:
+        convert a discrete action (int) into a numpy vector
+    '''
+    return discrete2continuous[a]
+
+action_space = DiscreteBugSpace(len(discrete2continuous))
+
+###############################################################################
 
 class Splatter(pygame.sprite.DirtySprite):
     '''
@@ -82,7 +95,7 @@ class Splatter(pygame.sprite.DirtySprite):
     '''
     def __init__(self, pos, mass = 50, ID = ID_ANIMAL):
         pygame.sprite.Sprite.__init__(self, self.containers)
-        self.radius = 10 + 10 * int(math.sqrt(mass/math.pi))
+        self.radius = 10 + 10 * int(np.sqrt(mass/np.pi))
         self.pos = pos
         self.counter = 100
         self.dirty = True
@@ -116,7 +129,7 @@ class Thing(pygame.sprite.DirtySprite):
     def __init__(self, pos, mass = 500, ID = ID_ROCK):
         pygame.sprite.Sprite.__init__(self, self.containers)
         self.ID = min(ID, ID_ANIMAL)
-        self.radius = 3 + int(math.sqrt(mass/math.pi))
+        self.radius = 3 + int(np.sqrt(mass/np.pi))
         self.energy = mass
         self.pos = pos
         self.is_colliding = True
@@ -175,7 +188,7 @@ class Thing(pygame.sprite.DirtySprite):
 
     def respawn(self, world): 
         self.pos = self.random_position(True)
-        self.energy = math.pi * (self.radius - 3)**2 
+        self.energy = np.pi * (self.radius - 3)**2 
 
     def hit_by(self, creature):
         '''
@@ -184,10 +197,10 @@ class Thing(pygame.sprite.DirtySprite):
         if self.ID == ID_PLANT and creature.ID >= ID_ANIMAL:
             theta = angle_of_attack(creature,self)
             # Given the correct angle of attack ...
-            if random.rand() > (theta / MIN_ATTACK_ANGLE):
+            if np.random.rand() > (theta / MIN_ATTACK_ANGLE):
                 # The creature can eat me (one bite at a time, relative to its own size)
                 Splatter(self.pos,self.radius,self.ID)
-                bite = random.rand() * creature.energy_limit * BITE_RATIO
+                bite = np.random.rand() * creature.energy_limit * BITE_RATIO
                 creature.energy = min(creature.energy + bite, creature.energy_limit)
                 self.energy = self.energy - bite
 
@@ -238,10 +251,10 @@ class Creature(Thing):
         self.selected = None
         self.points = 0
         # Attributes
-        self.unitv = unitv(random.randn(2))
+        self.unitv = unitv(np.random.randn(2))
         self.speed = 1.
-        self.move(action=action_space.sample())
-        self.observation = zeros(N_INPUTS, dtype=float)       
+        self.move(action=act_filter(action_space.sample()))
+        self.observation = np.zeros(N_INPUTS, dtype=float)       
         self._energy = self.energy
         self.nest = pos
         self.check_point = -1
@@ -287,14 +300,14 @@ class Creature(Thing):
                 if theta[i] < MIN_ATTACK_ANGLE:
                     # Attack succeeded
                     Splatter(self.pos,100,ID_ANIMAL)
-                    bite = random.rand() * abs(obj[i].speed) * 200. * BITE_RATIO
+                    bite = np.random.rand() * abs(obj[i].speed) * 200. * BITE_RATIO
                     # obj[i].energy = min(obj[i].energy + bite, obj[i].energy_limit)
                     obj[i].points = obj[i].points + bite
                     obj[j].energy = obj[j].energy - bite
                 else:
                     # Wrong angle of attack (bump!)
                     Splatter(self.pos,100,ID_ANIMAL)
-                    r = random.rand()
+                    r = np.random.rand()
                     bump = r * abs(obj[i].speed) * BOUNCE_DAMAGE
                     obj[i].energy = obj[i].energy - bump   # Ouch!
 
@@ -303,7 +316,7 @@ class Creature(Thing):
     def respawn(self, world, reward): 
         # Deal with the final reward and action
         world.increment_score(self.ssID,reward)
-        action = self.brain.act(obs_filter(self.observation),reward,True)
+        action = act_filter(self.brain.act(obs_filter(self.observation),reward,True))
         # Respawn
         self.pos = self.nest
         self.check_point = -1
@@ -347,7 +360,7 @@ class Creature(Thing):
 
         ######################################################
         # Observation (of the environment) 
-        self.observation = zeros(N_INPUTS, dtype=float)
+        self.observation = np.zeros(N_INPUTS, dtype=float)
         # Check collisions with terrain, and other objects
         self.observation[IDX_COLIDE],collision_obj,terrain_centre = world.collision_to_vision(self.pos,self.radius*CARAPACE_RANGE,self,s_collision_radius=self.radius)
         self.observation[IDX_PROBE1],o1,t1 = world.collision_to_vision(self.pos+self.pa1,self.radius*ANTENNA_RANGE,self)
@@ -387,7 +400,7 @@ class Creature(Thing):
 
         #######################################################
         # Get an action from the agent 
-        action = self.brain.act(obs_filter(self.observation),reward) 
+        action = act_filter(self.brain.act(obs_filter(self.observation),reward)) 
         if self.selected is not None:
             action = self.selected
 
@@ -404,8 +417,11 @@ class Creature(Thing):
         '''
 
         # Only allow a certain range of actions in this environment
-        angle = clip(action[IDX_ANGLE], action_space.low[0], action_space.high[0])
-        speed = clip(action[IDX_SPEED], action_space.low[1], action_space.high[1])
+        angle = action[IDX_ANGLE]
+        speed = action[IDX_SPEED]
+        if not DISCRETIZE_ACTION_SPACE:
+            angle = np.clip(action[IDX_ANGLE], action_space.low[0], action_space.high[0])
+            speed = np.clip(action[IDX_SPEED], action_space.low[1], action_space.high[1])
         # New velocity vector
         if angle < -0.01 or angle > 0.01:
             self.unitv = rotate(self.unitv,angle)
@@ -441,8 +457,8 @@ class Creature(Thing):
         pygame.draw.line(surface, self.observation[IDX_PROBE2] * 255, self.pos, self.pos+self.pa2, 2)
         # Wings (if flying)
         if self.speed > FLIGHT_SPEED:
-            wing1 = rotate(self.unitv * self.radius*2,+pi/2.8)
-            wing2 = rotate(self.unitv * self.radius*2,-pi/2.8)
+            wing1 = rotate(self.unitv * self.radius*2,+np.pi/2.8)
+            wing2 = rotate(self.unitv * self.radius*2,-np.pi/2.8)
             pygame.draw.line(surface, id2rgb[ID_ANIMAL], self.pos, self.pos-wing1, 6)
             pygame.draw.line(surface, id2rgb[ID_ANIMAL], self.pos, self.pos-wing2, 6)
         # Draw the standard image 
