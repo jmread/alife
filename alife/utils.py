@@ -82,11 +82,11 @@ def angle_of_attack(obj_1, obj_2):
         # they objects are on the same pixel
         return 0.
     # The angle between vector x and v
-    return arccos(np.dot(x/xnorm,obj_1.unitv))
+    return np.arccos(np.dot(x/xnorm,obj_1.unitv))
 
 def angles_of_attack(obj_1, obj_2):
     ''' the angles between two objects: obj_1 and a obj_2 
     wrt each other.'''
-    return [arccos(np.dot(unitv(obj_2.pos - obj_1.pos),obj_1.unitv)), 
-            arccos(np.dot(unitv(obj_1.pos - obj_2.pos),obj_2.unitv))]
+    return [np.arccos(np.dot(unitv(obj_2.pos - obj_1.pos),obj_1.unitv)), 
+            np.arccos(np.dot(unitv(obj_1.pos - obj_2.pos),obj_2.unitv))]
 

@@ -169,7 +169,7 @@ class World:
                         Thing(array(pygame.mouse.get_pos()), mass=100+random.rand()*cfg['max_plant_size'], ID=ID_PLANT)
                     elif event.key >= pygame.K_4 and event.key <= pygame.K_9:
                         K = event.key - pygame.K_4
-                        if len(agents) >= K:
+                        if len(agents) > K:
                             print("New Bug")
                             Creature(array(pygame.mouse.get_pos()), dna = list(agents)[K], ID = ID_ANIMAL + K)
                     elif event.key == pygame.K_r:
