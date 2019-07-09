@@ -3,19 +3,25 @@ world:
     tile_size: 64         # the length (and width) of a tile in pixels
     max_grid_objects: 100 # maximum objects that can be detected at once
     fps : 60              # frames per second
-    growth_rate : 200     # growth rate of plants (number per tick)
+    growth_rate : 100 #200     # growth rate of plants (number per tick)
     max_plant_size : 1500
 objects:
-    terrain_damage : 1.5
-    bounce_damage : 1.
-    flight_speed : 5.0
-    flight_boost : 5.0
+    terrain_damage : 5.5   # damage = terrain_damage * speed
+    bounce_damage : 10.
+    flight_speed : 1000 # 3.5
+    flight_boost : 1000 # 1.5
     default_mass_thing : 500
     default_mass_bug : 300
-    bite_ratio : 0.05
-    init_energy : 1.0
+    bite_ratio : 0.1
+    antenna_range : 2.
+    carapace_range : 3.
+    init_energy : 0.5        # % of max health/energy on spawn
     touch_threshold : 0.9    # after this level is considered touch
-    divide_limit : 2.0
+    divide_limit : -20.0     # <0 to disable
+    #divide_limit : 2.0
 bugs: # todo, include 1 and 2 for rock, plant, etc. 
-    1 : alife.agents.evolution/SimpleEvolver/{'H':10}
-    2 : alife.agents.evolution/SimpleEvolver/{'H':-10}
+    1 : alife.agents.hill_climbing/SimpleHillClimber/{'H':0, 'max_episode_length':500, 'num_episodes_per_test':5}
+    2 : alife.agents.hill_climbing/SimpleHillClimber/{'H':3, 'max_episode_length':500, 'num_episodes_per_test':5}
+    3 : alife.agents.hill_climbing/SimpleHillClimber/{'H':-3, 'max_episode_length':500, 'num_episodes_per_test':5}
+    4 : alife.agents.dumb/DumbAgent/{'name':'Dummy'}
+

@@ -2,13 +2,11 @@
 
 import pygame
 
+import time
+import yaml
+
 from graphics import *
 from objects import *
-
-# For saving and loading agents from disk
-import joblib, glob, time, datetime
-# For loading config
-import yaml
 
 # Parameters
 TILE_SIZE = 64               # tile size (width and height, in pixels)
@@ -19,19 +17,23 @@ class DrawGroup(pygame.sprite.Group):
         for s in self.sprites():
             s.draw(surface)
 
-def load_map(s):
-    ''' load a map from a text file '''
+def load_map(fname):
+    ''' Load a map from a text file '''
     MAP = zeros((10,10),dtype=int)
-    if s is not None:
-        MAP = genfromtxt(s, delimiter = 1, dtype=str)
+    if fname is not None:
+        MAP = genfromtxt(fname, delimiter = 1, dtype=str)
     return MAP[1:-1,1:-1]
 
-def get_conf(filename='conf.yml',section='world'):
-    return yaml.load(open(filename))[section]
+def get_conf(fname='conf.yml',section='world'):
+    #return yaml.load(open(fname), Loader=yaml.FullLoader)[section]
+    return yaml.load(open(fname))[section]
 
 class World:
     """
-        This is the world (environment) that objects exist in. 
+        A generic world (environment) that objects exist in. 
+
+        * Can be used for either Arcade, RPG, or RTS-style game. 
+        * Sprite-specific logic is handled in objects.py.
     """
 
     def __init__(self,fname=None,init_sprites=2):
@@ -47,18 +49,14 @@ class World:
         self.HEIGHT = self.N_ROWS * TILE_SIZE
         SCREEN = array([self.WIDTH, self.HEIGHT])
 
-        step = 0
-        growth_rate = cfg['growth_rate']
-
         ## GRID REGISTER and GRID COUNT 
         self.register = [[[None for l in range(MAX_GRID_DETECTION)] for k in range(self.N_ROWS)] for j in range(self.N_COLS)]
         #self.regcount = zeros(map_codes.shape,int) 
         self.regcount = zeros((self.N_COLS,self.N_ROWS),int) 
 
         ## INIT ##
-        pygame.display.set_caption("ALife / Bug World")
+        pygame.display.set_caption("ALife / Bug World [map: %s]" % fname)
         self.screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT))#, HWSURFACE|DOUBLEBUF)
-        #scroll_offset = array([0, 0])
         pygame.mouse.set_visible(1)
 
         ## BACKGROUND ##
@@ -73,14 +71,15 @@ class World:
         self.allSprites = DrawGroup()
         self.creatures = pygame.sprite.Group()
         self.plants = pygame.sprite.Group()
-        self.rocks = pygame.sprite.Group()
-        self.stumps = pygame.sprite.Group()
+        self.splatters = pygame.sprite.Group()
 
         Creature.containers = self.allSprites, self.creatures
         Thing.containers = self.allSprites, self.plants
+        Splatter.containers = self.splatters
 
         self.clock = pygame.time.Clock()
-        banner = get_banner("Start")
+        info_text = "Loading .."
+        self.score = {}
         
         # Some rocks and plants
         FACTOR = init_sprites
@@ -88,23 +87,21 @@ class World:
             Thing(self.random_position(), mass=100+random.rand()*1000, ID=ID_ROCK)
         for i in range(int(self.N_ROWS*FACTOR/5*self.N_COLS)):
             Thing(self.random_position(), mass=100+random.rand()*cfg['max_plant_size'], ID=ID_PLANT)
+        # The flag!
+        self.flag = Thing(self.random_position(), mass=800, ID=ID_MISC)
 
         # Get a list of the agents we may deploy 
         agents = get_conf(section='bugs').values()
 
-        # Some animate creatures
-        #for i in range(int(self.N_ROWS*FACTOR/10*self.N_COLS)):
-        for c in range(len(agents)):
-            p = self.random_position()
-            for i in range(FACTOR):
-                Creature(p + random.randn()*(TILE_SIZE/2), dna = list(agents)[c], ID=4+c)
-
         self.allSprites.clear(self.screen, background)
 
         ## MAIN LOOP ##
-        sel_obj = None 
+        growth_rate = cfg['growth_rate']             # How often to change iteration / add a plant
+        step = 0                                     # Current iteration
+        selected_obj = None 
         GRAPHICS_ON = True
         GRID_ON = False
+        INFO_ON = False
         self.FPS = FPS
         while True:
             self.clock.tick(self.FPS)
@@ -113,39 +110,33 @@ class World:
                 if event.type == QUIT:
                     return
                 if event.type == pygame.KEYUP:
-                    if sel_obj is not None:
-                        sel_obj.selected = array([-0.0,0.])
+                    if selected_obj is not None:
+                        selected_obj.selected = array([-0.0,0.])
                 if event.type == pygame.KEYDOWN:
-                    if sel_obj is not None:
+                    if selected_obj is not None:
                         # Human intervention in selected agent
                         if event.key == pygame.K_UP:
-                            sel_obj.selected = array([-0.0,3.])
+                            selected_obj.selected = array([-0.0,3.])
                         elif event.key == pygame.K_DOWN:
-                            sel_obj.selected = array([-0.0,5.1])
+                            selected_obj.selected = array([-0.0,10.1])
                         if event.key == pygame.K_RIGHT:
-                            sel_obj.selected = array([0.1,0.])
+                            selected_obj.selected = array([+pi/8,0.])
                         elif event.key == pygame.K_LEFT:
-                            sel_obj.selected = array([-0.1,0.])
-                        # TODO Restore control to RL agent later
+                            selected_obj.selected = array([-pi/8,0.])
+                        if event.key == pygame.K_DELETE:
+                            self.remove_score(selected_obj.ssID)
+                            selected_obj.kill()
                     if event.key == pygame.K_g:
                         GRAPHICS_ON = (GRAPHICS_ON != True)
                     elif event.key == pygame.K_d:
                         GRID_ON = (GRID_ON != True)
-                    #elif event.key == pygame.K_e:
-                    #    # TEST
-                    #    scroll_offset = scroll_offset - TILE_SIZE
-                    #    self.screen.blit(background, [0, 0])
-                    #elif event.key == pygame.K_u:
-                    #    # TEST
-                    #    scroll_offset = scroll_offset + TILE_SIZE
-                    #    self.screen.blit(background, [0, 0])
-                    elif event.key == pygame.K_s and sel_obj is not None:
-                        # TODO FIX
-                        print("[Error] Functionality currently broken ...")
-                        sel_obj.brain.save("./dat/dna/", "./dat/log/")
+                    elif event.key == pygame.K_s and selected_obj is not None:
+                        # WARNING: MAY NOT BE IMPLEMENTED IN ALL OBJECTS
+                        selected_obj.brain.save("./dat/dna/")
+                        print("[Saved] ...")
                     elif event.key == pygame.K_l:
                         # TODO FIX
-                        print("[Error] Functionality currently broken ...")
+                        print("[Warning] Functionality currently broken ...")
                         #for filename in glob.glob('./dat/dna/*.dat'):
                         #    brain = pickle.load(open(filename, "rb"))
                         #    meta_data = filename.split(".")
@@ -168,43 +159,45 @@ class World:
                         growth_rate = max(growth_rate - 100,10)
                         print("Higher energy influx (new plant every %d ticks)" % growth_rate)
                     elif event.key == pygame.K_1:
-                        print("New Rock")
+                        # Add a rock
                         Thing(array(pygame.mouse.get_pos()),mass=500, ID=ID_ROCK)
+                    elif event.key == pygame.K_2:
+                        # Change Flag Position
+                        self.flag.pos = array(pygame.mouse.get_pos())
                     elif event.key == pygame.K_3:
-                        print("New Plant")
+                        # Add a plant
                         Thing(array(pygame.mouse.get_pos()), mass=100+random.rand()*cfg['max_plant_size'], ID=ID_PLANT)
-                    elif event.key == pygame.K_4 and len(agents) >= (4-4):
-                        print("New Agent")
-                        Creature(array(pygame.mouse.get_pos()), dna = list(agents)[4-4], ID = 4)
-                    elif event.key == pygame.K_5 and len(agents) >= (5-4):
-                        print("New Agent")
-                        Creature(array(pygame.mouse.get_pos()), dna = list(agents)[5-4], ID = 5)
-                    elif event.key == pygame.K_6 and len(agents) >= (6-4):
-                        print("New Agent")
-                        Creature(array(pygame.mouse.get_pos()), dna = list(agents)[6-4], ID = 6)
-                    elif event.key == pygame.K_7 and len(agents) >= (7-4):
-                        print("New Agent")
-                        Creature(array(pygame.mouse.get_pos()), dna = list(agents)[7-4], ID = 7)
-                    elif event.key == pygame.K_8 and len(agents) >= (8-4):
-                        print("New Agent")
-                        Creature(array(pygame.mouse.get_pos()), dna = list(agents)[8-4], ID = 8)
+                    elif event.key >= pygame.K_4 and event.key <= pygame.K_9:
+                        K = event.key - pygame.K_4
+                        if len(agents) >= K:
+                            print("New Bug")
+                            Creature(array(pygame.mouse.get_pos()), dna = list(agents)[K], ID = ID_ANIMAL + K)
+                    elif event.key == pygame.K_r:
+                        print("=== RESET SCORE ===")
+                        self.score = {}
                     elif event.key == pygame.K_h:
+                        INFO_ON = (INFO_ON != True)
                         print("=== HELP ===")
-                        dic = ["VOID", "ROCK", "MISC", "BUG1", "BUG2", "BUG3"]
-                        print(dic)
+                        # TODO Add to banner/text here
 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     print("Click")
-                    sel_obj = self.quick_collision(pygame.mouse.get_pos())
+                    if selected_obj is not None:
+                        selected_obj.selected = None
+                    selected_obj = self.quick_collision(pygame.mouse.get_pos())
 
             # Make sure there is a constant flow of resources/energy into the system
             step = step + 1
             if step % growth_rate == 0:
-                p = self.random_position()
-                if p is not None and len(self.plants) < 1000:
-                    Thing(p, mass=100+random.rand()*cfg['max_plant_size'], ID=ID_PLANT)
-                banner = get_banner("t=%d; %d bugs" % (step,len(self.creatures)))
-                print("Time step %d; %d bugs alive" % (step,len(self.creatures)))
+                #n_plants = len(self.plants)
+                #p = self.random_position()
+                #if p is not None and n_plants < 30:
+                #    Thing(p, mass=100+random.rand()*cfg['max_plant_size'], ID=ID_PLANT)
+                # Update the banner info (we do this each growth tick)
+                info_text = "Stats and Scores:\n%d ticks\n%d bugs, %d objs\n" % (step,len(self.creatures),len(self.plants))
+                for key,val in self.score.items():
+                    info_text += "| %s: %7.1f\n" % (key,val)
+                print(info_text)
 
             # Reset reg-counts and Register all sprites
             self.regcount = zeros((self.N_COLS,self.N_ROWS),int) 
@@ -214,33 +207,53 @@ class World:
             # Routine
             for r in self.allSprites:
                 r.live(self)
+            for r in self.splatters:
+                r.live(self)
 
             if GRAPHICS_ON:
 
                 # Update sprites
                 self.allSprites.update()
-                # Draw the background
-                # @TODO redraw only the visible/active tiles; the ones with moving sprites ontop of them
-                self.screen.blit(background, [0,0]) #[scroll_offset[0], scroll_offset[1], scroll_offset[0] + 100, scroll_offset[1] + 100])
-                # Draw the grid
+                # Draw the background (TODO later: redraw only active tiles)
+                self.screen.blit(background, [0,0]) 
+                # Draw the grid (and anything else useful for debugging)
                 if GRID_ON:
-                    self.screen.blit(banner,[10,10])
                     # GRID ON
                     for l in range(0,self.N_ROWS*TILE_SIZE,TILE_SIZE):
                         pygame.draw.line(self.screen, COLOR_WHITE, [0, l], [SCREEN[0],l], 1)
                     for l in range(0,self.N_COLS*TILE_SIZE,TILE_SIZE):
                         pygame.draw.line(self.screen, COLOR_WHITE, [l, 0], [l,SCREEN[1]], 1)
-                # Draw the sprites
-                # @TODO draw only the dirty sprites (the ones that have moved since last time)
+                # Draw splatter
+                self.splatters.update()
+                more_rects = self.splatters.draw(self.screen)
+                pygame.display.update(more_rects)
+                # Draw the sprites (TODO later: redraw only the 'dirty' sprites)
                 rects = self.allSprites.draw(self.screen)
                 # Draw the selected sprite
-                if sel_obj is not None:
-                    sel_obj.draw_selected(self.screen)
+                if selected_obj is not None:
+                    selected_obj.draw_selected(self.screen)
+                # Draw text info/help
+                if INFO_ON:
+                    draw_banner(self.screen, info_text, align='r')
                 # Display
                 pygame.display.update(rects)
                 pygame.display.flip()
                 pygame.time.delay(self.FPS)
 
+    def remove_score(self, name):
+        ''' remove from the score board '''
+        if name in self.score:
+            del self.score[name]
+
+    def increment_score(self, name, points):
+        ''' increment the score board '''
+        if name in self.score:
+            self.score[name] = self.score[name] + points
+        else:
+            self.score[name] = points
+
+    def centre_position(self):
+        return array([self.WIDTH/2,self.HEIGHT/2])
 
     def random_position(self, on_empty=False):
         ''' Find a random position somewhere on the screen over land tiles
@@ -272,7 +285,7 @@ class World:
         return rx,ry
 
     def distance_to_wall(self,p,my_tile,ne_tile):
-        ''' Return the closest point on the wall to point 'p'.
+        ''' Return the closest point on the tile edge to point 'p'.
 
             p: 
                 my current position
@@ -283,7 +296,7 @@ class World:
 
             1. check if the tile is vertically or horizontally aligned with our 
                 tile (or neither)
-            2. return the distance to the edfe of the tile
+            2. return the distance to the edge of the tile
 
             Return: 
                 the distance to the neighbouring tile
@@ -329,9 +342,17 @@ class World:
 
     def collision_to_vision(self, s_point, s_radius, excl=None, s_collision_radius=1):
         '''
+            What an object sees in the environment. 
+            --------------------------------------
+
+            A sprite may be made up of different objects (body, antennae, 
+            etc.) 
+
+            These objects are defined by the parameters below. 
+
             Check collisions of some circle s (defined by s_point and s_radius) in the world.
 
-            The point and radius specified do not necessarily have to be a sprite.
+            The point and radius specified do not necessarily have refer to a sprite.
 
             Parameters
             ----------
@@ -340,15 +361,15 @@ class World:
                 the centre point of the object of interest
 
             s_radius : float
-                the radius of the object
+                the detection radius of the object
 
             excl : Thing
-                exclude this object from the search
+                exclude this object from the search (e.g., the sprite itself!)
 
             s_collision_radius : float
-                The true radius (not necessarily the detection radius) -- to detect actual collisions
-                This is normally an 'inner radius' (detection radius > body radius)
-                Being 1 as default, it means a collision only when the other object touches our centre point.
+                The actual radius of the object (it's actual body) which thus 
+                implies a collision (rather than a simple detection). 
+                The default 1 implies a single point (no mass)
 
 
             Returns
@@ -374,14 +395,14 @@ class World:
         grid_x, grid_y = self.pos2grid(s_point)
 
         # By default, we don't see anything (pure blackness)
-        vision = array([0.,0.,0.,])
+        vision = id2rgb[ID_VOID]
         # .. and we don't collide with anything.
         thing = None
 
         # Check collision with current tile
         if self.terrain[grid_y,grid_x] > 0:
             # We are colliding with (i.e., we are over) impassable terrain
-            vision = array([1.,1.,1.,])
+            vision = id2rgb[ID_ROCK]
             return vision, None, self.grid2pos((grid_x,grid_y))
 
         # Check collisions with objects in current and neighbouring tiles  
@@ -389,6 +410,9 @@ class World:
             g_x = (grid_x + i) % self.N_COLS
             for j in [-1,0,+1]:
                 g_y = (grid_y + j) % self.N_ROWS
+
+                # off the edge of the map
+                #if g_x < 0 or g_x >= N_COLS or g_y < 0 or g_y > self.N_ROWS:
 
                 # If we are looking at terrain tile ...
                 if i != 0 and j != 0 and self.terrain[g_y,g_x] > 0:
@@ -404,11 +428,12 @@ class World:
 
                 # Check for collisions with other objects in this tile
                 things = self.register[g_x][g_y]
-                for i in range(self.regcount[g_x,g_y]):
+                n_things = self.regcount[g_x,g_y]    # (n_things <= len(things))
+                for i in range(n_things):
                     # If this object is not me, ...
                     if things[i] != excl:
 
-                        # ... how much overlap with the this thing?
+                        # ... how much overlap with this thing?
                         olap = overlap(s_point,s_radius,things[i].pos,things[i].radius)
 
                         if olap > 0.:
@@ -438,24 +463,25 @@ class World:
             vision = clip(vision,0.0,1.) 
         else:
             # (we should only reach 1.0 if actually touching some thing -- even if visual field is overwhelmed)
-            # TODO could be relative, sigmoid/logarithmic, gaussian ?
+            # TODO could be relative, sigmoid/logarithmic, Gaussian ?
             vision = clip(vision,0.0,TOUCH_THRESHOLD) 
         return vision, thing, None
 
 def object2rgb(ID_self, ID_other):
-    '''
-        If an object of ID_self is in vision range of an object ID,other, what
-        does it see?
-    '''
-    if ID_self is None or ID_other < ID_ANIMAL:
-        # A plant and a rock always looks the same
-        return id2rgb[ID_other]
-    elif ID_self == ID_other:
-        # Of the same species
-        return id2rgb[ID_ANIMAL]
-    else:
-        # Another species
-        return id2rgb[ID_OTHER]
+#    '''
+#        If object 1 of ID_self is in vision range of object 2 of ID_other, 
+#        return the color seen by ID_self. 
+#    '''
+    return id2rgb[ID_other]
+#    if ID_self is None or ID_other < ID_ANIMAL:
+#        # A plant and a rock always looks the same
+#        return id2rgb[ID_other]
+#    elif ID_self == ID_other:
+#        # Of the same species
+#        return id2rgb[ID_ANIMAL]
+#    else:
+#        # Another species
+#        return id2rgb[ID_OTHER]
 
 def get_intensity(prox, prop):
     ''' 
@@ -466,15 +492,16 @@ def get_intensity(prox, prop):
 
         prox : float
             the relative distance to the object (should be in [0,1] where 1 is 
-            touching!)
+            touching)
         prop : float
             the size ratio of the object to us (where = 1 if same size, 0.1 if we
             are 10 times bigger than the object, etc.)
 
-        Note: prox should be normalized. 
-
-        Returns an intensity in [0,1] depending on size proportion and 
-        (inversely) on distance. 
+        Returns
+        -------
+        
+        An intensity in [0,1] depending on size proportion and (inversely) on 
+        distance. 
     '''
-    # Actually we ignore the size for now
+    # We ignore the size for now, thus just return proximity.
     return prox

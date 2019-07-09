@@ -2,30 +2,42 @@ import pygame
 from random import choice as choice
 from numpy import *
 
-# PyGame colours
+# Basic colors
 COLOR_TRANSPARENT = (1,2,3)
 COLOR_WHITE  = (255, 255, 255)
 COLOR_RED  = (255, 0, 0)
 COLOR_BLACK  = (0, 0, 0)
 
-# RGB intensities given a sprite ID
+# For 'splatter' artwork
+PAL_BLOOD = [ (255,0,0), (178,0,0), (91,0,0), (250,50,50), (204,61,61), ]
+PAL_PLANT = [ (37, 82, 59),  (53, 136, 86), (90, 171, 97), (98, 189, 105), (48, 105, 75),  (12, 56, 35) ]
+PAL_ROCK = [(45,44,44), (58,50,50), (73,60,60), (92,73,73), (101,83,83),]
+
+# Convert (ID) number to splatter color
+id2pal = [[COLOR_WHITE],PAL_ROCK,[COLOR_WHITE],PAL_PLANT,PAL_BLOOD,PAL_BLOOD]
+
+# Convert (ID) number to RGB intensities 
 id2rgb = array([
     [0.,0.,0.], # VOID     = 0  = BLACK
-    [1.,1.,1.], # ROCK     = 1  = WHITE
+    [0.,0.,1.], # ROCK     = 1  = WHITE
     [0.,0.,0.], # MISC     = 2  = BLACK
     [0.,1.,0.], # PLANT    = 3  = GREEN
-    [0.,0.,1.], # ANIMAL   = 4  = BLUE
+    [1.,0.,0.], # ALLY     = 4  = BLUE
     [1.,0.,0.], # ENEMY    = 5  = RED
     ])
 
-def rgb2color(a, default=COLOR_BLACK):
-    ''' 
-        Convert RGB intensity to a colour
-        (and return the default colour if there is no intensity)
+def build_splatter_img(pos,rad,ID):
     '''
-    if sum(a) <= .0:
-        return default
-    return a * 255
+        Draw some splatter around pos, with radius rad, color according to ID.
+    '''
+    image = pygame.Surface((rad*2, rad*2))
+    image.fill(COLOR_TRANSPARENT)
+    image.set_colorkey(COLOR_TRANSPARENT)
+    palette = id2pal[ID]
+    color = palette[random.choice(len(palette))]
+    pygame.draw.circle(image, color, [int(random.randn() * rad * 0.5 + rad),int(random.randn() * rad * 0.5 + rad)],random.choice(3)+1)
+    rect=image.get_rect(center=pos)
+    return rect, image
 
 def build_image_wireframe(pos,rad,ID):
     '''
@@ -48,7 +60,7 @@ def rotate(image, angle):
     return img_rotated.subsurface(rec_rotated).copy()
 
 def build_image_bank(image):
-    ''' Build images for every single angle 0...359 (applicable to moving sprites) '''
+    ''' Build images for every single angle 0,...,359 (to be used for rotating sprites) '''
     return [rotate(image, deg-180) for deg in range(360)]
 
 trees = [
@@ -129,7 +141,7 @@ def build_image_png(pos,rad,ID):
     if ID == 1:
         image = get_rock(random.choice(10))
     elif ID == 2:
-        print("No such object type")
+        image = pygame.image.load('./img/barrels_2.png').convert_alpha()
     elif ID == 3:
         image = get_tree(random.choice(len(trees)))
     elif ID >= 4 and ID <= 11:
@@ -188,32 +200,25 @@ def rebuild_map(background, tile_codes):
     #TODO
     return
 
-def get_banner(s):
-    image = pygame.Surface((300, 20))
-    image.fill(COLOR_TRANSPARENT)
-    image.set_colorkey(COLOR_TRANSPARENT)
-
-    myfont = pygame.font.SysFont("monospace", 17)
-    label = myfont.render(s, 1, COLOR_WHITE)
-    image.blit(label, [0,0])
-    return image
-
-def draw_banner(surface, s):
+def draw_banner(surface, s, max_txt='--------------------', align='l'):
+    '''
+        Draw text on existing surface
+    '''
+    # Get the size of the game display surface
+    (px_w,px_h) = surface.get_size()
     lines = s.split("\n")
-    #print(lines)
-    myfont = pygame.font.SysFont("monospace", 17)
-    l,h = myfont.size('--------------------')
-    pygame.draw.rect(surface, COLOR_BLACK, (1,1,1+l,1+h*len(lines)))
+    myfont = pygame.font.SysFont("monospace", 17) # TODO move up as global
+
+    # Get the estimated size needed to display the text
+    l,h = myfont.size(max_txt)
+    l = 1
+    if align=='r':
+        l = px_h - l*2
     j = 0
     color = COLOR_RED
     for line in lines:
-        #print(j,line)
-        label = myfont.render(line, 1, color)
-        surface.blit(label, [1,h*j])
+        label = myfont.render(line, l, color)
+        surface.blit(label, [l,h*j])
         j = j + 1
         color = COLOR_WHITE
 
-#from agents.evolution import SimpleEvolver 
-#a = SimpleEvolver(random.randn(2,1), random.randn(2,1), 3)
-#print(draw_banner(None,"%s \n (%s: G%d)" % ("5","5", 2)))
-#print(draw_banner(None,str(a)))

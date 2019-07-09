@@ -39,13 +39,11 @@ def slide_apart(obj_1,obj_2):
         obj_1.pos = obj_1.pos + velocity
         obj_2.pos = obj_2.pos - velocity
 
-def slide_off(s,p,min_dist=5.):
-    ''' Object 's' slides off point 'p' acccording to its own velocity 
+def slide_off(obj_1,p,min_dist=3.):
+    ''' Object 'obj_1' slides off point 'p' acccording to its own velocity 
     (and by at least 'min_dist') '''
-    # TODO - calculate the exact distance required to move it
-    s.speed = max(min_dist,s.speed)
-    s.unitv = unitv(s.pos - p)
-    s.pos = s.pos + s.unitv * s.speed
+    velocity = unitv(obj_1.pos - p) #* min_dist
+    obj_1.pos = obj_1.pos + velocity * max(min_dist,obj_1.speed)
 
 def rotate(v, theta=0.1):
     ''' rotation vector v by angle theta '''
@@ -68,17 +66,20 @@ def angle_deg(v):
         a = 360 + a
     return a
 
-def angle_cos(v1,v2):
-    ''' return the cosine of the angle between v1 and v2 (not normalized) '''
-    return arccos(dot(v1,v2)/(norm(v1)*norm(v2)))
+def cos_sim(v1,v2):
+    ''' cosine similarity: the cosine of the angle between v1 and v2 
+    (not necessarily normalized -- we do it here)'''
+    return dot(v1,v2)/(norm(v1)*norm(v2))
 
 def angle_of_attack(obj_1, obj_2):
-    ''' the angle between two objects: obj_1 and a obj_2 
-    wrt obj_1 approaching obj_2 '''
+    ''' the angle (in radians) between object obj_1 approaching obj_2 
+        returns
+            0 if the same object
+    '''
     x = obj_2.pos - obj_1.pos
     xnorm = norm(x) # vector between the two
     if xnorm <= 0:
-        # they objects are the same
+        # they objects are on the same pixel
         return 0.
     # The angle between vector x and v
     return arccos(dot(x/xnorm,obj_1.unitv))
