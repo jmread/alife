@@ -25,13 +25,13 @@ All this can be changed with Wrappers.
  
 To generate a new map (from `words/bugworld/maps`), e.g., a 10x20 map called `new_4`: 
 ```
-python3 -m worlds.bugworld.map_generator new_4 10 20
+python3 -m alife.map_generator new_4 10 20
 ```
 (you can change a few of the parameters first) which will produce `new_4.map`.
 
 To edit a map (you first need to put the file you just created in `worlds/bugworld/maps/`): 
 ```
-python3 -m worlds.bugworld.map_editor worlds/bugworld/maps/new_4.map
+python3 -m alife.map_editor alife/maps/new_4.map
 ```
 TODO file selector?
 TODO need to create `new_4.csv` if not already existent with minimal items
