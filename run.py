@@ -1,5 +1,5 @@
 """
-run.py — launch the World with pygame rendering.
+run.py -- launch the World with pygame rendering.
 
 Usage:
     python run.py
@@ -12,11 +12,11 @@ from alife import World
 
 def main():
     env = World(render_mode="human")
-    observations, infos = env.reset(seed=42)
+    observations, infos = env.reset(seed=42, options={'map_name' : "new_4"})
 
     # Test agents
-    env.add_agent(0, 'jesse') 
-    env.add_agent(1, 'jérémie') 
+    env.add_agent(0, 'agent_0') 
+    env.add_agent(1, 'agent_1') 
 
     print(f"Agents: {env.agents}")
 

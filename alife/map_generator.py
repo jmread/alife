@@ -84,7 +84,7 @@ print("======== * B * =========")
 B = pad(B, 0)
 # Save the file
 print(B)
-np.savetxt(filename, B, fmt="%d", delimiter="")
+np.savetxt("./alife/maps/"+filename, B, fmt="%d", delimiter="")
 
 # Draw it
 final_map, _ = draw_map(B)

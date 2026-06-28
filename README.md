@@ -11,7 +11,7 @@ Quick start:
 python run.py
 ```
 
-This is a multi-agent PettingZoo environment. You can run it as per any other PettingZoo environment, see, e.g., TODO_JEREMIES_REPOSITORY.
+This is a multi-agent PettingZoo environment. You can run it as per any other PettingZoo environment, see, e.g., TODO.git
 
 
 ##  'Gameplay'
