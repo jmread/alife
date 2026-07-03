@@ -23,13 +23,11 @@ All this can be changed with Wrappers.
 
 ## Map Editing and Environment Design
  
-To generate a new map (from `words/bugworld/maps`), e.g., a 10x20 map called `new_4`: 
+To generate a new map, e.g., a 10x20 map called `new_4`: 
 ```
 python3 -m alife.map_generator new_4 10 20
 ```
-(you can change a few of the parameters first) which will produce `new_4.map`.
-
-To edit a map (you first need to put the file you just created in `worlds/bugworld/maps/`): 
+which will produce `new_4.map`. To edit the map:
 ```
 python3 -m alife.map_editor alife/maps/new_4.map
 ```
@@ -52,9 +50,8 @@ TODO update
 
 ## Notes on Graphics
 
-* Terrain obtained from from [Open Game Art](https://opengameart.org/users/chabull) 
+* Terrain obtained from [Open Game Art](https://opengameart.org/users/chabull) 
 <!-- http://chabull.praire-chicken.com/index.html#work --> 
 <!-- csaba felvegi -->
 * Bug graphics from [Open Clip Art](https://openclipart.org/tags/ladybug)
-
 
