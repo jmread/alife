@@ -7,26 +7,10 @@ import numpy as np
 
 def t2i(t):
     return np.dot(t.flatten(), [1, 2, 4, 8])
-    #return np.dot(t.flatten(), [8, 4, 2, 1])
 
 
 def i2t(i):
-    # convert i (value between 0 and 15) into a 2x2 bit block
     return np.flip(np.array([int(x) for x in bin(i)[2:].zfill(4)])).reshape(2,2)
-    #return np.array([int(x) for x in bin(i)[2:].zfill(4)]).reshape(2,2)
-
-t = i2t(0)
-print(t)
-print(i2t(t2i(t)))
-
-for i in range(16):
-    print("##")
-    print(i)
-    t = i2t(i)
-    print(t)
-    print(i2t(t2i(t)))
-    #print(t.T)
-    #print(t2i(i))
 
 def convert_to_tiles(B):
     '''
@@ -82,9 +66,9 @@ def convert_to_bits(M):
     return B
 
 
-def pad(matrix, pad=0):
+def pad(matrix, padding=0):
     n_rows,n_cols = matrix.shape
-    M = np.ones((n_rows+2,n_cols+2),dtype=int) * pad
+    M = np.ones((n_rows+2,n_cols+2),dtype=int) * padding
     M[1:-1,1:-1] = matrix
     return M
 
