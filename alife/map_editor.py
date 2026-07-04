@@ -16,6 +16,22 @@ from .constants import IDX_id, IDX_x, IDX_y, IDX_pos, IDX_rad, IDX_img, IDX_flg
 
 GRID_SIZE = 64              # tile size (width and height, in pixels)
 
+HELP_LINES = [
+    "h         Toggle this help",
+    "Click     Select object",
+    "r         Add rock",
+    "p         Add plant",
+    "d         Add decor (flag/nest)",
+    "m         Move selected to cursor",
+    "DEL       Delete selected",
+    "UP/DOWN   Resize selected",
+    "LEFT/RIGHT  Change image",
+    "+ / -     Reorder z-index",
+    "1-8, 0    Set flag label",
+    "f         Clear flag label",
+    "s         Save to file",
+]
+
 def pos2grid(p, TILE_SIZE=64):
     ''' Convert (x,y)-point to (j,k)-grid reference ''' 
     x, y = p #np.clip(p,[0,0],self.terrain.shape * TILE_SIZE)
@@ -69,9 +85,9 @@ def editor_interface(world_info):
     #image = build_image_png([0,0],int(sprites[i,IDX_rad]),int(sprites[i,IDX_id]),int(sprites[i,IDX_img]))[1]
     sprites = []
 
-    try: 
+    try:
         print("[World] Load Sprites ..")
-        sprites = np.loadtxt(fname_sprites,delimiter=',',dtype=int)
+        sprites = np.atleast_2d(np.loadtxt(fname_sprites,delimiter=',',dtype=int))
         # Check for correct number of columns
         if sprites.shape[1] == 5:
             # Add a sixth column of -1
@@ -83,12 +99,14 @@ def editor_interface(world_info):
             #sprites[sprites[:, 0] == -1, 0] = -1
         elif sprites.shape[1] != 6:
             raise ValueError("Input file must have 5 or 6 columns")
-    except:
-        print("[World] Error: ", sys.exc_info()[0])
-        print("      > No sprite file found...")
-        sprites = np.array([ID_FLAG, GRID_SIZE*2, GRID_SIZE*2, 15, 0]).reshape(1,-1)
+    except Exception as e:
+        print("[World] Error: ", type(e).__name__, e)
+        print("      > No sprite file found; creating a default flag sprite...")
+        sprites = np.array([ID_FLAG, GRID_SIZE*2, GRID_SIZE*2, 15, 0, -1]).reshape(1,-1)
 
     print(sprites)
+
+    show_help = False
 
     selected_sprite = None
     i_sel = -1
@@ -125,6 +143,8 @@ def editor_interface(world_info):
                 if event.key == pygame.K_s: 
                     print(sprites)
                     np.savetxt(fname_sprites, sprites, delimiter=',',fmt='%d')
+                if event.key == pygame.K_h:
+                    show_help = not show_help
                 if event.key == pygame.K_r: 
                     # Rock
                     pos = pygame.mouse.get_pos()
@@ -219,6 +239,12 @@ def editor_interface(world_info):
 
             if selected_sprite is not None:
                 pygame.draw.circle(screen, COLOR_WHITE, selected_sprite[IDX_pos], selected_sprite[IDX_rad] + 3, 4)
+
+            if show_help:
+                help_font = pygame.font.SysFont("monospace", 24)
+                for i, line in enumerate(HELP_LINES):
+                    label = help_font.render(line, 0, COLOR_WHITE)
+                    screen.blit(label, (10, 10 + i * 20))
 
             pygame.display.flip()
 

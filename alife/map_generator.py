@@ -19,6 +19,7 @@ NOTES:
 
 from .graphics import draw_map
 from .map_tools import pad
+from pathlib import Path
 import sys
 
 N_rows = 6
@@ -39,10 +40,9 @@ if len(sys.argv) < 4:
 map_name = sys.argv[1]
 N_rows = int(sys.argv[2])
 N_cols = int(sys.argv[3])
-N_cols = int(sys.argv[3])
 filename = f"{map_name}.map"
-assert(N_rows % 2 == 0, f"{N_rows} is not an even number")
-assert(N_cols % 2 == 0, f"{N_cols} is not an even number")
+assert N_rows % 2 == 0, f"{N_rows} is not an even number"
+assert N_cols % 2 == 0, f"{N_cols} is not an even number"
 assert(N_rows >= 4)
 assert(N_cols >= 4)
 
@@ -50,12 +50,6 @@ assert(N_cols >= 4)
 print(f"Creating {N_rows}x{N_cols} map: {filename}")
 
 filename = map_name+'.map'
-
-#########################################################
-# Shape of bit matrix
-N_rows -= 2
-N_cols -= 2
-#########################################################
 
 def generate_island(n_rows, n_cols, land_prob=0.65, iterations=5):
     # Initialize random binary matrix
@@ -78,13 +72,13 @@ def generate_island(n_rows, n_cols, land_prob=0.65, iterations=5):
     return grid
 
 # Generate bit map
-B = generate_island(N_rows,N_cols, iterations=1)
+B = generate_island(N_rows - 2, N_cols - 2, iterations=1)
 print("======== * B * =========")
 # Make a sea border
 B = pad(B, 0)
 # Save the file
 print(B)
-np.savetxt("./alife/maps/"+filename, B, fmt="%d", delimiter="")
+np.savetxt(Path(__file__).parent / "maps" / filename, B, fmt="%d", delimiter="")
 
 # Draw it
 final_map, _ = draw_map(B)
