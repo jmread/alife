@@ -14,36 +14,13 @@ import pygame
 # For networking
 from .utils import get_centres, rotate, cos_sim, get_tiles, unitv, overlap, slide_off, collision, dist_point_to_rect3
 from .graphics import id2rgb, ID_FLAG, ID_VOID, ID_ANIMAL, ID_ROCK, ID_PLANT, build_bg_png as build_map, draw_state
-from config import MAP_DIR
+from config import MAP_DIR, FPS
 
 print("[World] Setting parameters")
 from .constants import *
 
-FPS = 6
 N = N_SPRITE
 D = D_SPRITE
-print("      > Obs indices: %d" % D_SPRITE)
-print("      > Max sprites: %d" % N_SPRITE)
-
-labels = ['--' for _ in range(D_SPRITE)]
-labels[IDX_id] = 'id'
-labels[IDX_x] = 'x'
-labels[IDX_y] = 'y'
-labels[IDX_vx] = 'vx'
-labels[IDX_vy] = 'vy'
-labels[IDX_rad] = 'rad'
-labels[IDX_img] = 'sid'
-labels[IDX_health] = '[+]'
-labels[IDX_COLIDE] = ' o '
-#labels[IDX_PROXIMITY] = '(o)'
-labels[IDX_nesti] = 'nst'
-labels[IDX_flagi] = 'flg'
-#labels[IDX_PROBE1] = ['L-R', 'L-G', 'L-B']
-#labels[IDX_PROBE2] = ['R-R', 'R-G', 'R-B']
-labels[IDX_ENERGY] = 'nrg'
-labels[IDX_speed] = '|v|'
-labels[IDX_RWD] = 'rwd'
-
 
 i_VOID = -2     # emptyness
 i_CLIFF = -1     # cliff/rock
@@ -57,15 +34,6 @@ ANTENNA_RATIO = 3
 SPEAR_RATIO = 2.5
 TERRAIN_DAMAGE = 1 # Added factor when hitting a wall or landing on water
 PERCENT_INIT_ENERGY = 0.5       # How much of its max energy is a creature born with
-
-def print_sprites(sprite_array,j_list,labels, DEBUG=False): 
-    if not DEBUG:
-        return
-    print("---------- SPRITES -------------")
-    print('___|' + '|'.join(["%5s " % labels[j] for j in j_list]))
-    for i in range(len(sprite_array)): 
-        print(("%2d |" % i) + '|'.join(["%5d " % int(sprite_array[i,j]) for j in j_list]))
-    print("--------------------------------")
 
 class World(ParallelEnv):
     """ A World.
@@ -147,10 +115,12 @@ class World(ParallelEnv):
 
     def reset(self, seed=None, options={'map_name' : "new_4"}):
 
+        ## LOAD MAP AND ASSOCIATED SPRITE DATA
+        bname_map = options['map_name']
+
         ## PYGAME STUFF
 
         if self.render_mode == "human":
-            bname_map = options['map_name']
             self._init_pygame(bname_map)
 
         N = len(self.possible_agents)
@@ -173,7 +143,6 @@ class World(ParallelEnv):
         self.i_base = self.load_sprites(fname_sprites)
         self.n_sprites = self.i_base
         print("[World] Loaded %d inanimate sprites" % self.i_base)
-        print_sprites(self.sprites,DEBUG_INDICES,labels, DEBUG=False)
 
         print("[World] Set special sprites")
         self.sprites[i_CLIFF,IDX_id] = ID_ROCK
@@ -192,18 +161,6 @@ class World(ParallelEnv):
         infos        = {a: {} for a in self.agents}
 
         return observations, infos
-
-#    def get_info(self):
-#        ''' Need to make available this information on the environment to any client. 
-#        '''
-#        #TODO might be able to get this information from server.py without requiring this function?
-#        return {
-#            'basename' : self.env_id,
-#            'd_S' : int(np.prod(self.observation_space.shape)),
-#            'd_A' : int(np.prod(self.action_space.shape)),
-#            'space_S' : serialize_space(self.observation_space),
-#            'space_A' : serialize_space(self.action_space),
-#        }
 
     def step(self, actions):
         '''
@@ -233,88 +190,74 @@ class World(ParallelEnv):
             
         ''' 
         self.t += 1
+        self._update(actions)
+        return self._observe()
 
-        rewards, terminations, truncations, infos = {}, {}, {}, {}
+    def _update(self, actions):
+        """ Phase 1: Advance world state s -> s' given actions.
 
-        # Stop not-responding window
-        # self.handle_events()
-
-        # -------------------------------------------------------------
-        # Reset, cleanup from last time
-        # -------------------------------------------------------------
-        self.sprites[self.i_base:self.n_sprites,IDX_done] = 0 
-        self.sprites[self.i_base:self.n_sprites,IDX_RWD] = 0 
-        # Reset reg-counts and Register all sprites
+            Applies all actions, moves sprites, then resolves all
+            interactions (terrain death, bumping, spearing, starvation).
+            No observations are read here — all state mutations only.
+        """
+        # Reset per-step state
+        self.sprites[self.i_base:self.n_sprites, IDX_done] = 0
+        self.sprites[self.i_base:self.n_sprites, IDX_RWD] = 0
         self.regcount[:] = self.regbase
 
-        # -------------------------------------------------------------
-        # Set actions, and check what's left over
-        # -------------------------------------------------------------
-        for i in range(self.i_base,self.n_sprites):
-            cid = int(self.sprites[i,IDX_cid])
-            self.sprites[i,IDX_ACTIONS] = actions[cid]
-
-        # -------------------------------------------------------------
-        # Environment deals with Creature actions
-        # -------------------------------------------------------------
-
-        # Do actions, record movements
-        for i in range(self.i_base,self.n_sprites):
-            # Action
+        # Apply actions, move sprites, register in spatial grid
+        for i in range(self.i_base, self.n_sprites):
+            cid = int(self.sprites[i, IDX_cid])
+            self.sprites[i, IDX_ACTIONS] = actions[cid]
             self.enact(i)
-            # Register
-            j,k = self.pos2grid(self.sprites[i,IDX_pos])
-            c = self.regcount[j,k]
-            self.register[j,k,c] = i
-            self.regcount[j,k] += 1
+            j, k = self.pos2grid(self.sprites[i, IDX_pos])
+            self.register[j, k, self.regcount[j, k]] = i
+            self.regcount[j, k] += 1
 
-        # Reset first
-        self.sprites[:,IDX_COLIDE] = 0 
-        self.sprites[:,IDX_PROXIMITY] = 0 
+        # Resolve all interactions (state mutations only)
+        for i in range(self.i_base, self.n_sprites):
+            self._resolve_terrain(i)
+            self._resolve_body(i)
+            self._resolve_combat(i)
 
-        # Live (individual calculations, collisions, etc.)
-        for i in range(self.i_base,self.n_sprites):
-            self.do_vision_check(i)
+        # Starvation check
+        for i in range(self.i_base, self.n_sprites):
+            if self.sprites[i, IDX_health] <= 1:
+                self.respawn(i, RWD_DEATH, msg="starvation death")
+
+        # Energy cost of living
+        self.sprites[self.i_base:self.n_sprites, IDX_health] -= 0.01
+
+    def _observe(self):
+        """ Phase 2: Extract observations o = phi(s') from the updated state.
+
+            All state mutations are complete; sprite positions are final.
+        """
+        # Reset observation buffers
+        self.sprites[:, IDX_COLIDE] = 0
+        self.sprites[:, IDX_PROXIMITY] = 0
+
+        # Sense the environment from final positions
+        for i in range(self.i_base, self.n_sprites):
+            self._sense_terrain(i)
+            self._sense_body(i)
+            self._sense_antennae(i)
             self.do_flag_check(i)
-            # health check
-            if self.sprites[i,IDX_health] <= 1:
-                self.respawn(i,RWD_DEATH,msg="starvation death")
 
-        # Moving burns energy according to size and speed and the angle of turn
-        self.sprites[self.i_base:self.n_sprites,IDX_health] -= 0.01
+        # Normalize observations
+        self.sprites[self.i_base:self.n_sprites, IDX_health] = np.clip(
+            self.sprites[self.i_base:self.n_sprites, IDX_health], -MAX_HEALTH, MAX_HEALTH)
+        self.sprites[self.i_base:self.n_sprites, IDX_ENERGY] = np.clip(
+            self.sprites[self.i_base:self.n_sprites, IDX_health] / MAX_HEALTH, 0, 1)
+        self.sprites[self.i_base:self.n_sprites, IDX_PROXIMITY] = np.clip(
+            self.sprites[self.i_base:self.n_sprites, IDX_PROXIMITY], 0, 1)
 
-        # -------------------------------------------------------------
-        # Extract an observation from the full state space
-        # o[t] = phi(s[t])
-        # -------------------------------------------------------------
-
-        # Normalization of energy levels
-        self.sprites[self.i_base:self.n_sprites,IDX_health] = np.clip(self.sprites[self.i_base:self.n_sprites,IDX_health],-MAX_HEALTH,MAX_HEALTH)
-        self.sprites[self.i_base:self.n_sprites,IDX_ENERGY] = np.clip(self.sprites[self.i_base:self.n_sprites,IDX_health]/MAX_HEALTH,0,1)
-        # Clip proximity sensor
-        self.sprites[self.i_base:self.n_sprites,IDX_PROXIMITY] = np.clip(self.sprites[self.i_base:self.n_sprites,IDX_PROXIMITY],0,1)
-
-        print_sprites(self.sprites,DEBUG_INDICES,labels, DEBUG=False)
-
-        # -------------------------------------------------------------
-        # Environment is observed (by the Creatures)
-        # return o[t], r[t] --> agent
-        # -------------------------------------------------------------
-
-        observations = {}
-        rewards = {}
-        terminations = {}
-        truncations = {}
-        infos = {}
-
-        for i, k in enumerate(self.sprites[self.i_base:self.n_sprites,IDX_cid]):
-            #print(int(k), i, self.sprites[self.i_base+i,IDX_OBS])
-            observations[int(k)] = self.sprites[self.i_base+i,IDX_OBS]
-            v = observations[int(k)]
-            if not (np.all((observations[int(k)] >= 0) & (observations[int(k)] <= 1))):
-                   print("\n\n\n\n\n\n\n\n\n\n\n\nNot all observations are between 0 and 1 inclusive\n", observations)
-            rewards[int(k)] = float(self.sprites[self.i_base+i,IDX_RWD])
-            terminations[int(k)] = bool(self.sprites[self.i_base+i,IDX_done]) 
+        # Build return dicts
+        observations, rewards, terminations, truncations, infos = {}, {}, {}, {}, {}
+        for i, k in enumerate(self.sprites[self.i_base:self.n_sprites, IDX_cid]):
+            observations[int(k)] = self.sprites[self.i_base + i, IDX_OBS]
+            rewards[int(k)] = float(self.sprites[self.i_base + i, IDX_RWD])
+            terminations[int(k)] = bool(self.sprites[self.i_base + i, IDX_done])
             truncations[int(k)] = False
             infos[int(k)] = {}
 
@@ -331,9 +274,6 @@ class World(ParallelEnv):
                 raise SystemExit
 
         # Draw
-
-        #print_sprites(self.sprites[self.i_base:self.n_sprites],DEBUG_INDICES,labels, DEBUG=False)
-        #self._screen.fill((30, 30, 30))
         self._screen.blit(self.background, [0,0]) 
         draw_state(self._screen, self.sprites[0:self.n_sprites], self.images, self.names)
         pygame.display.flip()
@@ -377,9 +317,8 @@ class World(ParallelEnv):
 
         # the space we have chosen to put this must be available
         if self.sprites[i,IDX_cid] > 0:
-            print_sprites(self.sprites,DEBUG_INDICES,labels,DEBUG=True)
             print("i=",self.n_sprites)
-            exit(1)
+            raise SystemExit
 
         # must have space in the sprite array for this
         assert(i+1 < len(self.sprites))
@@ -427,7 +366,7 @@ class World(ParallelEnv):
             return i
         else:
             print("[World] No rows satisfy the conditions.")
-            exit(1)
+            raise SystemExit
         return 0
 
     def deselect_sprite(self, c_id, i):
@@ -460,11 +399,11 @@ class World(ParallelEnv):
         # Load data from the file 
         try: 
             print("[World] Load Sprites ..")
-            things = np.loadtxt(fname,delimiter=',',dtype=int)
+            things = np.atleast_2d(np.loadtxt(fname,delimiter=',',dtype=int))
         except:
             print("[World] Error: ", sys.exc_info()[0])
             print("      > No sprite file found...")
-            exit(1)
+            raise SystemExit
 
         for i,thing in enumerate(things): 
 
@@ -505,18 +444,48 @@ class World(ParallelEnv):
         # Death and rebirth; increment global score and respawn
         print("[World] sprite[%d] respawn @ %s [%s] (inest=%d): %s" % (i,str(self.sprites[i,IDX_pos]),str(self.sprites[nest_i,IDX_pos]),nest_i,msg))
 
-    def do_vision_check(self, i):
-        """
-            Process vision (collisions with terrain/other objects)
-        """
+    def _resolve_combat(self, i):
+        """ Phase 1: Resolve spear combat (eating, checkpoints, fighting). """
+        spear_pos = self.sprites[i, IDX_pos] + self.sprites[i, IDX_spear0]
+        i_victim = self.point_collision(spear_pos)
 
-        # ... then process
-        self.process_vision(i)
+        # Spearing nothing
+        if i_victim == i_VOID:
+            return
 
-        self.sprites[i,IDX_PROBE1] = self.get_pixel(self.sprites[i,IDX_pos] + self.sprites[i,IDX_anten1])
-        self.sprites[i,IDX_PROBE2] = self.get_pixel(self.sprites[i,IDX_pos] + self.sprites[i,IDX_anten2])
+        # Speared the target flag — checkpoint
+        if i_victim == int(self.sprites[i, IDX_flagi]):
+            self.sprites[i, IDX_RWD] += RWD_CHECKPOINT
+            self.sprites[i, IDX_flagi] = self._next_flag(i)
+            self.sprites[i, IDX_damage] = -80
+            return
 
-        self.spearing(i,self.point_collision(self.sprites[i,IDX_pos] + self.sprites[i,IDX_spear0]))
+        # Cliff or rock — no effect
+        if int(self.sprites[i_victim, IDX_id]) == ID_ROCK:
+            return
+
+        # Only animals can spear further
+        if self.sprites[i, IDX_id] != ID_ANIMAL:
+            return
+
+        id_victim = int(self.sprites[i_victim, IDX_id])
+        if id_victim == ID_PLANT:
+            self.sprites[i, IDX_health] += BITE_SIZE
+            self.sprites[i_victim, IDX_health] -= BITE_SIZE
+            self.sprites[i_victim, IDX_damage] = -40
+        elif id_victim == ID_ANIMAL:
+            self.sprites[i_victim, IDX_health] -= BITE_SIZE
+            self.sprites[i_victim, IDX_damage] = -40
+        elif id_victim == ID_FLAG:
+            pass
+        else:
+            print("[World]._resolve_combat ---- unexpected victim id:", id_victim)
+
+    def _sense_antennae(self, i):
+        """ Phase 2: Read color at the two antenna tips. """
+        pos = self.sprites[i, IDX_pos]
+        self.sprites[i, IDX_PROBE1] = self.get_pixel(pos + self.sprites[i, IDX_anten1])
+        self.sprites[i, IDX_PROBE2] = self.get_pixel(pos + self.sprites[i, IDX_anten2])
 
     def _next_flag(self, i):
         ''' Target next flag.
@@ -599,47 +568,47 @@ class World(ParallelEnv):
         k = np.floor(x / TILE_SIZE).astype(int)
         return (j, k)
 
-    def body_sensor(self, i, j, k): 
-        ''' Sprite-sprite body collisions (wrt i-th sprite). 
+    def _resolve_body(self, i):
+        """ Phase 1: Resolve physical collisions with other sprites (bumping). """
+        s_pos = self.sprites[i, IDX_pos]
+        j_s, k_s = self.pos2grid(s_pos)
 
-            Set IDX_COLIDE and IDX_PROXIMITY.
-
-            Assume: centre point, 
-                inner (rad)    'touch range' <=> the actual body delimiter
-                OUTER_RADIUS   'hearing range' <=> a proximity sensor
-
-            Paramemters
-            -----------
-
-            i, j, k : sprite i at tile (j,k)
-                (these are given together for efficiency reasons)
-
-        '''
-
-        # Check all sprites in the register ...
-        c = self.regcount[j,k]
-        for i_other in self.register[j,k,0:c]:
-
-            # If this object is not me, and positive id ...  
-            if i != i_other and self.sprites[i_other,IDX_id] > 0:
-
-                # Check if sprite i can 'hear/see/detect' sprite i_other
-                overlap_with_thing = overlap(self.sprites[i,IDX_pos],OUTER_RADIUS,self.sprites[i_other,IDX_pos],self.sprites[i_other,IDX_rad])
-
-                if overlap_with_thing > 0:
-                    # - 
-                    # yes, in proximity, but not necessarily touching ...
-                    # -
-                    dist_between_rings = OUTER_RADIUS - self.sprites[i,IDX_rad] # Distance between inner and outer radius
-                    self.sprites[i,IDX_PROXIMITY] += (overlap_with_thing / dist_between_rings)
-
+        for _j, _k in self.get_ne_tiles(s_pos):
+            j = j_s + _j
+            k = k_s + _k
+            if self.terrain[j, k] > 0:
+                continue
+            c = self.regcount[j, k]
+            for i_other in self.register[j, k, 0:c]:
+                if i != i_other and self.sprites[i_other, IDX_id] > 0:
+                    dist_between_rings = OUTER_RADIUS - self.sprites[i, IDX_rad]
+                    overlap_with_thing = overlap(
+                        self.sprites[i, IDX_pos], OUTER_RADIUS,
+                        self.sprites[i_other, IDX_pos], self.sprites[i_other, IDX_rad])
                     if overlap_with_thing > dist_between_rings:
-                        # - 
-                        # And actually touching ...
-                        # - 
-                        self.sprites[i,IDX_COLIDE] = 1 
-                        # Deal with bumping
-                        self.bumping(i,i_other)
+                        self.bumping(i, i_other)
+
+    def _sense_body(self, i):
+        """ Phase 2: Observe proximity and collision with other sprites. """
+        s_pos = self.sprites[i, IDX_pos]
+        j_s, k_s = self.pos2grid(s_pos)
+
+        for _j, _k in self.get_ne_tiles(s_pos):
+            j = j_s + _j
+            k = k_s + _k
+            if self.terrain[j, k] > 0:
+                continue
+            c = self.regcount[j, k]
+            for i_other in self.register[j, k, 0:c]:
+                if i != i_other and self.sprites[i_other, IDX_id] > 0:
+                    overlap_with_thing = overlap(
+                        self.sprites[i, IDX_pos], OUTER_RADIUS,
+                        self.sprites[i_other, IDX_pos], self.sprites[i_other, IDX_rad])
+                    if overlap_with_thing > 0:
+                        dist_between_rings = OUTER_RADIUS - self.sprites[i, IDX_rad]
+                        self.sprites[i, IDX_PROXIMITY] += (overlap_with_thing / dist_between_rings)
+                        if overlap_with_thing > dist_between_rings:
+                            self.sprites[i, IDX_COLIDE] = 1
 
 
     def bumping(self, i, i_victim): 
@@ -682,56 +651,8 @@ class World(ParallelEnv):
 
         self.sprites[i,IDX_pos] += slide_off(self.sprites[i,IDX_pos],self.sprites[i,IDX_speed],self.sprites[i_victim,IDX_pos])
 
-    def spearing(self, i, i_victim): 
-        '''
-            Sprite i spears object i_.
 
-            if i_victim another sprite, attack (bugs, even from the same team/specicies, can accidentally spear each other),
-            if i_victim a plant, eat a bit of it
-
-            Parameters
-            ----------
-
-            i : int
-                sprite id (animate)
-            i_victim : int
-                sprite id (animate or inaninmate)
-        '''
-
-        # Spearing nothing does nothing
-        if self.sprites[i_victim,IDX_id] == ID_VOID:
-            return
-        # If spearing the target flag (even if its invisible) 
-        elif i_victim == int(self.sprites[i,IDX_flagi]):
-            # We have speared the flag, collect reward, and go to the next waypoint
-            self.sprites[i,IDX_RWD] += RWD_CHECKPOINT
-            self.sprites[i,IDX_flagi] = self._next_flag(i)
-            self.sprites[i,IDX_damage] = -80
-        # Spearing a cliff does nothing
-        if self.sprites[i_victim,IDX_id] == ID_ROCK:
-            return
-        # Inanimate sprites cannot spear others (shouldn't be here)
-        if self.sprites[i,IDX_id] != ID_ANIMAL:
-            return
-        # Bugs eat plants
-        elif self.sprites[i_victim,IDX_id] == ID_PLANT:
-            self.sprites[i,IDX_health] += BITE_SIZE
-            self.sprites[i_victim,IDX_health] -= BITE_SIZE
-            self.sprites[i_victim,IDX_damage] = -40
-        # Bugs hurt each other in fights
-        elif self.sprites[i_victim,IDX_id] == ID_ANIMAL:
-            self.sprites[i_victim,IDX_health] -= BITE_SIZE
-            self.sprites[i_victim,IDX_damage] = -40
-        # I don't know what happened here
-        elif self.sprites[i_victim,IDX_id] == ID_FLAG:
-            #print("[World].spearing ---- just spearing invisible stuff (nest? someone else's flag?); ignore" )
-            pass 
-        else:
-            print("[World].spearing ---- wtf (probably the victim is someone else's flag?", self.sprites[i,IDX_id], self.sprites[i_victim,IDX_id], i, i_victim)
-            exit(1)
-
-
-    def get_pixel(self, p): 
+    def get_pixel(self, p):
         '''
         Point p is a single-pixel eye (in RGB color), what does it see?
 
@@ -814,73 +735,46 @@ class World(ParallelEnv):
         # 
         return get_tiles(right,bottom)
 
-    def process_vision(self, i):
-        '''
-            Collision Sensor (1D)
-            ---------------------
+    def _resolve_terrain(self, i):
+        """ Phase 1: Terrain death and collision damage/slide. """
+        s_pos = self.sprites[i, IDX_pos]
+        j_s, k_s = self.pos2grid(s_pos)
 
-            What the i-th sprite sees in the environment via its body sensor.
-
-            This refers specifically to IDX_COLIDE and IDX_PROXIMITY.
-
-            Check 
-                1) proximity and collisions 
-                2) in the world; including both other sprites and terrain tiles. 
-
-            Parameters
-            ----------
-
-            i : int
-                sprite index
-
-            Returns
-            -------
-            
-            A tuple (vision,thing,type) where 
-                vision : float
-                    grayscale intensity (in [0,1]) of the resulting collisions 
-                thing : Thing 
-                    the object that we collided with (None if terrain)
-                type : list 
-                    the centre point(s) of terrain tile(s) we collided with (empty or None otherwise)
-                    None if we are ontop of a terrain tile!
-        '''
-
-        s_pos = self.sprites[i,IDX_pos]       # We are currently at this position
-        j_s, k_s = self.pos2grid(s_pos)       # We are currently in this tile/square
-
-        if self.terrain[j_s,k_s] >= 1: 
-            # 2. WATER OVERLAP/DEATH. We are *on* a terrain tile - Instant death!
-            print("[World] Instant death for sprite %d, on terrain tile %d,%d" % (i,j_s,k_s))
-            self.respawn(i,RWD_DEATH,msg="terrain death")
+        # On a water/cliff tile — instant death
+        if self.terrain[j_s, k_s] >= 1:
+            self.respawn(i, RWD_DEATH, msg="terrain death")
             return
 
-        # Check collisions with objects in current and neighbouring tiles  
-        # From the current point, get the current and three neighboring tiles.
-        for _j,_k in self.get_ne_tiles(s_pos):
-
+        # Check neighboring water/cliff tiles for wall collisions
+        for _j, _k in self.get_ne_tiles(s_pos):
             j = j_s + _j
             k = k_s + _k
+            if self.terrain[j, k] <= 0:
+                continue
+            c_pos = self.grid2pos[j, k]
+            dist_center_to_wall = dist_point_to_rect3(s_pos, c_pos, TILE_SIZE, TILE_SIZE)
+            if dist_center_to_wall < self.sprites[i, IDX_rad]:
+                self.sprites[i, IDX_health] -= max(1, abs(self.sprites[i, IDX_speed]) * TERRAIN_DAMAGE)
+                self.sprites[i, IDX_pos] += slide_off(s_pos, self.sprites[i, IDX_speed], c_pos)
 
-            if self.terrain[j,k] <= 0:
-                # 1. NON-WATER. Check for collisions with other objects in this tile instead
-                self.body_sensor(i,j,k) 
+    def _sense_terrain(self, i):
+        """ Phase 2: Sense proximity to terrain tiles. """
+        s_pos = self.sprites[i, IDX_pos]
+        j_s, k_s = self.pos2grid(s_pos)
 
-            else:
-                c_pos = self.grid2pos[j,k]
+        # If on water, already respawned in Phase 1 — nothing to sense
+        if self.terrain[j_s, k_s] >= 1:
+            return
 
-                dist_center_to_wall = dist_point_to_rect3(s_pos,c_pos,TILE_SIZE,TILE_SIZE)
-
-                if dist_center_to_wall < self.sprites[i, IDX_rad]:
-                    # 3.A TERRAIN (CLIFF/WATER) COLLISION 
-                    #print("[World]: CLIFF/WATER Collision")
-                    self.sprites[i,IDX_health] -= max(1, abs(self.sprites[i,IDX_speed]) * TERRAIN_DAMAGE)
-                    # Slide off/away from the tile N.B. There could be other tile collisions too!    
-                    self.sprites[i,IDX_pos] += slide_off(s_pos,self.sprites[i,IDX_speed],c_pos)
-
-                elif dist_center_to_wall < OUTER_RADIUS:
-                    # 3.B) TERRAIN TILE IN PROXIMITY
-                    self.sprites[i,IDX_PROXIMITY] = 1. - (dist_center_to_wall - self.sprites[i,IDX_rad]) / (OUTER_RADIUS - self.sprites[i,IDX_rad]) 
+        for _j, _k in self.get_ne_tiles(s_pos):
+            j = j_s + _j
+            k = k_s + _k
+            if self.terrain[j, k] <= 0:
+                continue
+            c_pos = self.grid2pos[j, k]
+            dist_center_to_wall = dist_point_to_rect3(s_pos, c_pos, TILE_SIZE, TILE_SIZE)
+            if self.sprites[i, IDX_rad] <= dist_center_to_wall < OUTER_RADIUS:
+                self.sprites[i, IDX_PROXIMITY] = 1. - (dist_center_to_wall - self.sprites[i, IDX_rad]) / (OUTER_RADIUS - self.sprites[i, IDX_rad])
 
 
 
