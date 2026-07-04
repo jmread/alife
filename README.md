@@ -16,9 +16,7 @@ This is a multi-agent PettingZoo environment. You can run it as per any other Pe
 
 ##  'Gameplay'
 
-An agent-controlled bug should find its way from its 'nest' to the 'flag', avoiding obstacles (including other agents), and consuming enough resources to sustain itself on its journey. The default observation space is 2-pixel RGB-color vision, plus some 'health/energy' level and a rough sensor indicating which way it is pointing in the map. Each dimension/variable is continuous, with a range between 0 and 1 (inclusive). Continuous action space is two dimensional (each between -1 and +1) with one being the angle and the other being the velocity, of the bug. 
-
-All this can be changed with Wrappers. 
+Numerous gameplay configurations are possible involving e.g., speedrunning, bumper cars, capture the flag, king of the hill, etc. Involving the bugs (agents), plants, and obstacles/rocks. The observation and action space are kept as simple as possible to avoid the need for super-deep architectures. Vision is based on 2-pixel RGB-color vision, plus some 'health/energy' level and a rough sensor indicating which way it is pointing in the map.  
 
 
 ## Map Editing and Environment Design
