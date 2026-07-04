@@ -163,8 +163,6 @@ def get_tilegraphics(tile_size=128):
                 tiles[i].append(tile.resize((128,128)))
     return tiles
 
-tiles = get_tilegraphics()
-
 def build_image_png(pos,rad,ID,SSID=-1):
     '''
         Load the appropriate image given an object ID and sub-ID,
@@ -186,6 +184,9 @@ def build_image_png(pos,rad,ID,SSID=-1):
     return rect, image
 
 def draw_map(B, tile_size=128, grid_lines=False):
+
+    tiles = get_tilegraphics()
+
     M, T = convert_to_tiles(B)
     #print("======== * M * =========")
     #print(M)
