@@ -6,7 +6,7 @@ import numpy as np
     A simple tile-based random-map generator. 
     -----------------------------------------
 
-    1. generate a bitmap with perlin noise
+    1. generate a bitmap
     2. match the bitmap to tiles
     3. save the tilemap
 
