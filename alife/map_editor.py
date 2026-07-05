@@ -11,8 +11,8 @@ np.set_printoptions(threshold=np.inf, precision=1)
 import pygame
 
 from .graphics import N_array, COLOR_WHITE, get_label
-from .graphics import build_image_bank, build_bg_png as build_map, build_image_png, ID_ROCK, ID_PLANT, ID_VOID, ID_ANIMAL, ID_FLAG, f_array
-from .constants import IDX_id, IDX_x, IDX_y, IDX_pos, IDX_rad, IDX_img, IDX_flg
+from .graphics import build_image_bank, build_bg_png as build_map, build_image_png, ID_ROCK, ID_PLANT, ID_ANIMAL, ID_FLAG, f_array
+from .constants import IDX_id, IDX_x, IDX_y, IDX_pos, IDX_rad, IDX_img, IDX_sid
 
 GRID_SIZE = 64              # tile size (width and height, in pixels)
 
@@ -130,8 +130,8 @@ def editor_interface(world_info):
 
         for i, sprite in enumerate(sprites): 
             screen.blit(images[i], sprite[IDX_pos] - sprite[IDX_rad])
-            if sprite[IDX_flg] >= 0:
-                name_label = get_label("%d" % int(sprite[IDX_flg]))
+            if sprite[IDX_sid] >= 0:
+                name_label = get_label("%d" % int(sprite[IDX_sid]))
                 screen.blit(name_label, sprite[IDX_pos] - sprite[IDX_rad])
 
         for event in pygame.event.get():
@@ -175,25 +175,25 @@ def editor_interface(world_info):
                     #    selected_obj.pos = np.array(pygame.mouse.get_pos())
                     #    self.add_to_fixed_register(selected_obj)
                     if event.key == pygame.K_f: 
-                        selected_sprite[IDX_flg] = -1
+                        selected_sprite[IDX_sid] = -1
                     if event.key == pygame.K_1: 
-                        selected_sprite[IDX_flg] = 1
+                        selected_sprite[IDX_sid] = 1
                     if event.key == pygame.K_2: 
-                        selected_sprite[IDX_flg] = 2
+                        selected_sprite[IDX_sid] = 2
                     if event.key == pygame.K_3: 
-                        selected_sprite[IDX_flg] = 3
+                        selected_sprite[IDX_sid] = 3
                     if event.key == pygame.K_4: 
-                        selected_sprite[IDX_flg] = 4
+                        selected_sprite[IDX_sid] = 4
                     if event.key == pygame.K_5: 
-                        selected_sprite[IDX_flg] = 5
+                        selected_sprite[IDX_sid] = 5
                     if event.key == pygame.K_6: 
-                        selected_sprite[IDX_flg] = 6
+                        selected_sprite[IDX_sid] = 6
                     if event.key == pygame.K_7: 
-                        selected_sprite[IDX_flg] = 7
+                        selected_sprite[IDX_sid] = 7
                     if event.key == pygame.K_0: 
-                        selected_sprite[IDX_flg] = 0
+                        selected_sprite[IDX_sid] = 0
                     if event.key == pygame.K_8: 
-                        selected_sprite[IDX_flg] = 8
+                        selected_sprite[IDX_sid] = 8
                     if event.key == pygame.K_m: 
                         pos=np.array(pygame.mouse.get_pos())
                         if selected_sprite is not None:

@@ -6,8 +6,8 @@ from PIL import Image, ImageDraw, ImageFont
 from config import IMG_DIR
  
 # Types of Sprites/Things/Objects
-ID_FLAG = -1   
-ID_VOID = 0   # Colorless objects (not visible to bugs)
+ID_FLAG = -1  # A flag/nest is something which has no physical presence (i.e., not directly visible or collidable to sprites) but is drawn, and some game logic may be associated.
+ID_VOID = 0   # Not anything; a colorless objects (not visible to bugs) nor any game logic associated with it; at most a placeholder.
 ID_ROCK = 1   # Blue objects
 ID_PLANT = 2  # Green objects
 ID_ANIMAL = 3 # Red objects
@@ -269,6 +269,8 @@ def draw_state(screen, sprites, images, names):
     '''
     n, d = sprites.shape
     for i in range(n):
+        if sprites[i,IDX_id] == 0:
+            continue
         if sprites[i,IDX_id] == ID_ANIMAL: 
             if images[i] is None: 
                 # Build the image, as it is specified
@@ -340,7 +342,7 @@ def draw_bug(screen, sprites, images, names, i, p=None):
     # Flag
     # for i in range(1,50): 
     #     pygame.draw.circle(surface, COLOR_WHITE, p.astype(int), i * DISTANCE_BETWEEN_CHECKPOINTS, 1)
-    i_flag = int(sprite[IDX_flagi])
+    i_flag = int(sprite[IDX_tid])
     p_flag = sprites[i_flag,IDX_pos].astype(int)
     pygame.draw.line(screen, COLOR_WHITE, p, p_flag, 1)
 

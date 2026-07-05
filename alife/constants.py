@@ -12,12 +12,6 @@ MAX_HEALTH = 100             #
 BITE_SIZE = 10
 BUMP_SIZE = 5
 
-# Dynamics
-MAX_SPEED = 10          # Maximum speed in pixels/tick
-TURN_SPEED = 0.10       # radians per frame
-ACCEL = 0.2             # rate of speed increase
-BRAKE_DECEL = 0.4       # stop faster when no input
-
 # STATE -- for all objects, does not change; needed to load objects from disk
 IDX_id = 0                     # int : object id; either ID_ROCK, ID_PLANT, ID_ANIMAL, etc.
 IDX_x = 1                      # int             
@@ -25,10 +19,10 @@ IDX_y = 2                      # int
 IDX_pos = [IDX_x, IDX_y]       # [int,int]                              
 IDX_rad = 3                    # int
 IDX_img = 4                    # int : image id; the 'coat' for a given sprite of type id              
-IDX_flg = 5                    # int : 0 if a nest, n for n-th flag, -1 otherwise
-DISK_INDICES = [IDX_id, IDX_x, IDX_y, IDX_rad, IDX_img, IDX_flg]
-# INTERNAL STATE -- for network
-IDX_cid = 37                   # int : carrier id; if > 0, then there is a carrier 
+IDX_sid = 5                    # int : this is a sub-id; 
+                               #                if sprite[IDX_id] = ID_FLAG (i.e., a flag/nest) then sprite[IDX_sid] = n for n-th flag
+                               #                if sprite[IDX_id] = ID_ANIMAL (i.e., another bug) then sprite[IDX_sid] = Team ID
+DISK_INDICES = [IDX_id, IDX_x, IDX_y, IDX_rad, IDX_img, IDX_sid]
 # INTERNAL STATE -- for computations and drawing
 IDX_spear0 = [6,7]             # int : relative position of spear (supposing base at [0,0])
 IDX_anten1 = [8,9]             # int : relative position of left antenna (supposing base at [0,0])
@@ -38,7 +32,7 @@ IDX_vy = 13                    # float
 IDX_unitv = [IDX_vx, IDX_vy]   # float
 IDX_dangle = 14                # float : unused
 IDX_penergy = 15               # float : unused
-IDX_flagi = 16                 # int : points to the array index of the flag this sprite should look for
+IDX_tid = 16                   # int : targit id; points to the id (array index) of the sprite that this sprite should look for/target
 IDX_health = 17                # int : between 0 and MAX_HEALTH
 IDX_damage = 18                # int : for tracking external splatter
 IDX_speed = 19                 # int : internal state speed 
@@ -62,11 +56,8 @@ IDX_RWD = 33
 ## DONE
 IDX_done = 34 
 
-IDX_i = 35                     # int : the actual array index (actual unique object index) --- unused ?
 IDX_nesti = 36                 # int : unused
-
-# NEEDED FOR DEBUGGING
-DEBUG_INDICES = [IDX_id] + IDX_pos + [IDX_img] + [IDX_RWD, IDX_rad] + [IDX_cid]
+IDX_cid = 37                   # int : unused
 
 D_SPRITE = 38
 N_SPRITE = 50

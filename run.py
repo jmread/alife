@@ -15,8 +15,10 @@ def main():
     observations, infos = env.reset(seed=42, options={'map_name' : "new_4"})
 
     # Test agents
-    env.add_agent(0, 'agent_0') 
-    env.add_agent(1, 'agent_1') 
+    env.add_agent('agent_0')
+    env.add_agent('agent_1')
+    env.add_agent('agent_2')
+    env.add_agent('agent_3')
 
     print(f"Agents: {env.agents}")
 

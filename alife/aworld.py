@@ -53,18 +53,14 @@ class World(ParallelEnv):
         super().__init__()
 
         self.render_mode = render_mode
-        self.possible_agents = [f"agent_{i}" for i in range(N)]
+        self.possible_agents = []
+        self.agents = []
+        self.active_agents = []
 
         ## Spaces ## 
 
-        self.action_spaces = {
-            a: gym.spaces.MultiBinary(2)
-            for a in self.possible_agents
-        }
-        self.observation_spaces = {
-            a: gym.spaces.Box(low=0, high=1, shape=(d_S,), dtype=np.float32)
-            for a in self.possible_agents
-        }
+        self.action_spaces = {}
+        self.observation_spaces = {}
 
         # pygame state
         self._screen  = None
@@ -114,6 +110,8 @@ class World(ParallelEnv):
         self.images = [None for _ in range(N+1)]
 
     def reset(self, seed=None, options={'map_name' : "new_4"}):
+        ''' Reset the environment (state).
+        '''
 
         ## LOAD MAP AND ASSOCIATED SPRITE DATA
         bname_map = options['map_name']
@@ -123,16 +121,16 @@ class World(ParallelEnv):
         if self.render_mode == "human":
             self._init_pygame(bname_map)
 
-        N = len(self.possible_agents)
-        self.agents     = self.possible_agents[:]
+        self.agents = []
+        self.active_agents = []
         self.t   = 0
 
         ## GRID REGISTER and GRID COUNT 
 
         # Name register
-        self.names = ["" for i in range(N)]
+        self.names = ["" for _ in range(N_SPRITE)]
         # Sprite register for creatures 
-        self.sprites = np.zeros((N,D_SPRITE), dtype=np.float32)
+        self.sprites = np.zeros((N_SPRITE, D_SPRITE), dtype=np.float32)
         # Grid register for everything
         self.register = np.zeros((*self.terrain.shape,MAX_GRID_DETECTION),int) 
         self.regbase = np.zeros_like(self.terrain)        # count of non-animals (fixed, once the map is loaded)
@@ -141,7 +139,6 @@ class World(ParallelEnv):
         # Sprite and grid register for rocks and plants (and nest and flag)
         fname_sprites = os.path.join(MAP_DIR, bname_map+'.csv')
         self.i_base = self.load_sprites(fname_sprites)
-        self.n_sprites = self.i_base
         print("[World] Loaded %d inanimate sprites" % self.i_base)
 
         print("[World] Set special sprites")
@@ -155,10 +152,8 @@ class World(ParallelEnv):
         ## MAIN LOOP ##
         print("[World] Done init")
 
-        observations = {a: None for a in self.agents}
-        for i, k in enumerate(self.sprites[self.i_base:self.n_sprites,IDX_cid]):
-            observations[int(k)] = self.sprites[self.i_base+i,IDX_OBS].astype(np.float32)
-        infos        = {a: {} for a in self.agents}
+        observations = {}
+        infos        = {}
 
         return observations, infos
 
@@ -190,78 +185,82 @@ class World(ParallelEnv):
             
         ''' 
         self.t += 1
+
         self._update(actions)
-        return self._observe()
+
+        self._observe()
+
+        # Build return dicts
+        observations, rewards, terminations, truncations, infos = {}, {}, {}, {}, {}
+        for i in self.active_agents:
+            observations[i] = self.sprites[i, IDX_OBS].copy()
+            rewards[i] = float(self.sprites[i, IDX_RWD])
+            terminations[i] = bool(self.sprites[i, IDX_done])
+            truncations[i] = False
+            infos[i] = {}
+
+        return observations, rewards, terminations, truncations, infos
 
     def _update(self, actions):
-        """ Phase 1: Advance world state s -> s' given actions.
+        """ Phase 1: Advance world state:
+
+                s' = f(s,{a})
 
             Applies all actions, moves sprites, then resolves all
             interactions (terrain death, bumping, spearing, starvation).
             No observations are read here — all state mutations only.
         """
         # Reset per-step state
-        self.sprites[self.i_base:self.n_sprites, IDX_done] = 0
-        self.sprites[self.i_base:self.n_sprites, IDX_RWD] = 0
+        self.sprites[self.active_agents, IDX_done] = 0
+        self.sprites[self.active_agents, IDX_RWD] = 0
         self.regcount[:] = self.regbase
 
-        # Apply actions, move sprites, register in spatial grid
-        for i in range(self.i_base, self.n_sprites):
-            cid = int(self.sprites[i, IDX_cid])
-            self.sprites[i, IDX_ACTIONS] = actions[cid]
-            self.enact(i)
+        # Apply action logic, move sprites, register in spatial grid
+        for i in self.active_agents:
+            self.enact(self.sprites[i], actions[i])
             j, k = self.pos2grid(self.sprites[i, IDX_pos])
             self.register[j, k, self.regcount[j, k]] = i
             self.regcount[j, k] += 1
 
-        # Resolve all interactions (state mutations only)
-        for i in range(self.i_base, self.n_sprites):
+        # Resolve all interactions (state mutations only) -- game logic
+        for i in self.active_agents:
             self._resolve_terrain(i)
             self._resolve_body(i)
             self._resolve_combat(i)
 
-        # Starvation check
-        for i in range(self.i_base, self.n_sprites):
+        # Death check
+        for i in self.active_agents:
             if self.sprites[i, IDX_health] <= 1:
                 self.respawn(i, RWD_DEATH, msg="starvation death")
 
         # Energy cost of living
-        self.sprites[self.i_base:self.n_sprites, IDX_health] -= 0.01
+        self.sprites[self.active_agents, IDX_health] -= 0.01
 
     def _observe(self):
-        """ Phase 2: Extract observations o = phi(s') from the updated state.
+        """ Phase 2: Extract observations from the updated state.
+
+            {o} = g(s')
 
             All state mutations are complete; sprite positions are final.
         """
-        # Reset observation buffers
-        self.sprites[:, IDX_COLIDE] = 0
-        self.sprites[:, IDX_PROXIMITY] = 0
+        # Reset observation buffers for active agents
+        self.sprites[self.active_agents, IDX_COLIDE] = 0
+        self.sprites[self.active_agents, IDX_PROXIMITY] = 0
 
         # Sense the environment from final positions
-        for i in range(self.i_base, self.n_sprites):
+        for i in self.active_agents:
             self._sense_terrain(i)
             self._sense_body(i)
             self._sense_antennae(i)
             self.do_flag_check(i)
 
         # Normalize observations
-        self.sprites[self.i_base:self.n_sprites, IDX_health] = np.clip(
-            self.sprites[self.i_base:self.n_sprites, IDX_health], -MAX_HEALTH, MAX_HEALTH)
-        self.sprites[self.i_base:self.n_sprites, IDX_ENERGY] = np.clip(
-            self.sprites[self.i_base:self.n_sprites, IDX_health] / MAX_HEALTH, 0, 1)
-        self.sprites[self.i_base:self.n_sprites, IDX_PROXIMITY] = np.clip(
-            self.sprites[self.i_base:self.n_sprites, IDX_PROXIMITY], 0, 1)
-
-        # Build return dicts
-        observations, rewards, terminations, truncations, infos = {}, {}, {}, {}, {}
-        for i, k in enumerate(self.sprites[self.i_base:self.n_sprites, IDX_cid]):
-            observations[int(k)] = self.sprites[self.i_base + i, IDX_OBS]
-            rewards[int(k)] = float(self.sprites[self.i_base + i, IDX_RWD])
-            terminations[int(k)] = bool(self.sprites[self.i_base + i, IDX_done])
-            truncations[int(k)] = False
-            infos[int(k)] = {}
-
-        return observations, rewards, terminations, truncations, infos
+        self.sprites[self.active_agents, IDX_health] = np.clip(
+            self.sprites[self.active_agents, IDX_health], -MAX_HEALTH, MAX_HEALTH)
+        self.sprites[self.active_agents, IDX_ENERGY] = np.clip(
+            self.sprites[self.active_agents, IDX_health] / MAX_HEALTH, 0, 1)
+        self.sprites[self.active_agents, IDX_PROXIMITY] = np.clip(
+            self.sprites[self.active_agents, IDX_PROXIMITY], 0, 1)
 
     def render(self):
         if self.render_mode != "human":
@@ -275,7 +274,8 @@ class World(ParallelEnv):
 
         # Draw
         self._screen.blit(self.background, [0,0]) 
-        draw_state(self._screen, self.sprites[0:self.n_sprites], self.images, self.names)
+        n_draw = max(self.i_base, max(self.active_agents, default=0) + 1)
+        draw_state(self._screen, self.sprites[0:n_draw], self.images, self.names)
         pygame.display.flip()
         self._clock.tick(FPS)
 
@@ -285,94 +285,53 @@ class World(ParallelEnv):
             self._screen = None
 
 
-    def add_agent(self, c_id, name):
-        """ Create an agent entry, with sprite id 'c_id', and name (or, any additional descriptor) 'name'.  
+    def add_agent(self, name=""):
+        """ Add an agent to the world. Auto-assigns the agent_id as the first
+            free row at or above i_base. The agent_id is the row index in the
+            sprites array and the key for all PettingZoo dicts.
 
-        We really must insist that there be no existing 
-
-        Parameters
-        ----------
-        c_id : int
-            agent id - if such as id is already in the world, you might complain, but this shouldn't happen
-            
-        name : str
-            the description of the agent
-
+            Returns
+            -------
+            int : the agent_id (row index)
         """
-        agent_id = int(c_id)
-        if agent_id in self.agents:
-            return  # already active, do nothing
+        # Find first free row at or above i_base
+        for i in range(self.i_base, N_SPRITE):
+            if self.sprites[i, IDX_id] == 0:
+                break
+        else:
+            raise RuntimeError("No free sprite slots")
 
-        # PettingZoo stuff
+        agent_id = i
 
+        # PettingZoo registration
         self.possible_agents.append(agent_id)
         self.agents.append(agent_id)
+        self.active_agents.append(agent_id)
 
-        self.observation_spaces[agent_id] =  gym.spaces.Box(low=0, high=1, shape=(d_S,), dtype=np.float32)
-        self.action_spaces[agent_id] = gym.spaces.MultiBinary(2)
+        self.observation_spaces[agent_id] = gym.spaces.Box(low=0, high=1, shape=(d_S,), dtype=np.float32)
+        self.action_spaces[agent_id] = gym.spaces.MultiBinary(d_A)
 
-        # My internals
+        # Sprite setup
+        self.names[agent_id] = name
+        self.sprites[agent_id, IDX_id] = ID_ANIMAL
+        self.sprites[agent_id, IDX_rad] = INNER_RADIUS
+        self.sprites[agent_id, IDX_img] = agent_id % 7
+        self.sprites[agent_id, IDX_unitv] = np.array([0, 1])
+        self.sprites[agent_id, IDX_spear0] = rotate(self.sprites[agent_id, IDX_unitv] * self.sprites[agent_id, IDX_rad] * SPEAR_RATIO / 2, 0.0)
+        self.sprites[agent_id, IDX_anten1] = rotate(self.sprites[agent_id, IDX_unitv] * self.sprites[agent_id, IDX_rad] * ANTENNA_RATIO, +0.3)
+        self.sprites[agent_id, IDX_anten2] = rotate(self.sprites[agent_id, IDX_unitv] * self.sprites[agent_id, IDX_rad] * ANTENNA_RATIO, -0.3)
+        self.respawn(agent_id, 0, 0, msg="just init")
 
-        i = self.n_sprites
+        return agent_id
 
-        # the space we have chosen to put this must be available
-        if self.sprites[i,IDX_cid] > 0:
-            print("i=",self.n_sprites)
-            raise SystemExit
-
-        # must have space in the sprite array for this
-        assert(i+1 < len(self.sprites))
-
-        # @todo -- check first from the database, if there is some previous information on pos/energy/points/etc.
-        #print("TODO Query database")
-        self.names[i] = name
-        self.sprites[i, IDX_id] = ID_ANIMAL
-        self.sprites[i, IDX_rad] = INNER_RADIUS
-        self.sprites[i, IDX_img] = c_id % 7
-        self.sprites[i, IDX_cid] = c_id
-        self.sprites[i, IDX_unitv] = np.array([0,1])
-        # TODO, N.B. always rotating by the same amounts, so we could store the rotation matrix M for speed
-        self.sprites[i, IDX_spear0] = rotate(self.sprites[i, IDX_unitv] * self.sprites[i,IDX_rad]*SPEAR_RATIO/2,0.0) # antenna right pos
-        self.sprites[i, IDX_anten1] = rotate(self.sprites[i, IDX_unitv] * self.sprites[i,IDX_rad]*ANTENNA_RATIO,+0.3) # antenna left pos
-        self.sprites[i, IDX_anten2] = rotate(self.sprites[i, IDX_unitv] * self.sprites[i,IDX_rad]*ANTENNA_RATIO,-0.3) # antenna right pos
-        self.respawn(i, 0, 0, msg="just init")
-
-        self.n_sprites = i + 1
-
-    def del_agent(self, cid): 
-        '''
-            Remove the sprite entry at position i
-        '''
-        i = np.where(self.sprites[:, IDX_cid] == cid)[0][0]
-
-        n = self.n_sprites
-        # remove this sprite (n.b. this includes cid=0)
-        self.sprites[i, :] = 0
-        # copy over the top
-        self.sprites[i:n-1, :] = self.sprites[i+1:n, :]
-        # remove the tail end 
-        self.sprites[n, :] = 0
-        # decount the sprite
-        self.n_sprites = self.n_sprites - 1
-
-    def select_sprite(self, c_id, n_limit): 
-        '''
-            Find any sprite with no carrier
-        '''
-        valid_indices = np.where((self.sprites[0:n_limit, IDX_id] == ID_ROCK) & (self.sprites[0:n_limit, IDX_cid] <= 0))[0]
-        if len(valid_indices) > 0:
-            i = np.random.choice(valid_indices)
-            self.sprites[i, IDX_cid] = c_id
-            return i
-        else:
-            print("[World] No rows satisfy the conditions.")
-            raise SystemExit
-        return 0
-
-    def deselect_sprite(self, c_id, i):
-        assert(self.sprites[i, IDX_cid] == c_id)
-        self.sprites[i, IDX_cid] = 0
-        return i
+    def del_agent(self, agent_id):
+        """ Remove an agent. Zeroes the row and marks it ID_VOID (no compaction). """
+        self.sprites[agent_id, :] = 0
+        self.names[agent_id] = ""
+        self.active_agents.remove(agent_id)
+        self.agents.remove(agent_id)
+        if agent_id in self.possible_agents:
+            self.possible_agents.remove(agent_id)
 
 
     def load_sprites(self, fname): 
@@ -423,7 +382,7 @@ class World(ParallelEnv):
     def do_flag_check(self,i):
 
         # This is the index of the flagged object we're chasing
-        i_FLAG = int(self.sprites[i,IDX_flagi])
+        i_FLAG = int(self.sprites[i,IDX_tid])
         # Check which way we're pointing
         flag_angle = cos_sim(self.sprites[i,IDX_unitv],self.sprites[i,IDX_pos] - self.sprites[i_FLAG,IDX_pos]) 
         self.sprites[i,IDX_FLAG] = flag_angle * -1*(flag_angle <= 0)
@@ -433,14 +392,14 @@ class World(ParallelEnv):
         self.sprites[i,IDX_health] = MAX_HEALTH * PERCENT_INIT_ENERGY
         self.sprites[i,IDX_RWD] += rwd_T
         self.sprites[i,IDX_done] = done
-        # Choose a random nest-position to start at
-        nest_i = int(np.random.choice(np.where((self.sprites[:, IDX_id] == ID_FLAG) & (self.sprites[:, IDX_flg] == 0))[0]))
+        # Choose a random nest-position to start at (nests are at flags with sub-id of 0)
+        nest_i = int(np.random.choice(np.where((self.sprites[:, IDX_id] == ID_FLAG) & (self.sprites[:, IDX_sid] == 0))[0]))
         self.sprites[i,IDX_pos] = self.sprites[nest_i, IDX_pos]
         self.sprites[i,IDX_unitv] = unitv(rotate(self.sprites[i,IDX_unitv],np.random.randn()*np.radians(360)))
         # Start from scratch
         self.sprites[i,IDX_speed] = 0
         # Choose a random first flag
-        self.sprites[i,IDX_flagi] = np.random.choice(np.where(self.sprites[:, IDX_flg] == 1)[0])
+        self.sprites[i,IDX_tid] = np.random.choice(np.where(self.sprites[:, IDX_sid] == 1)[0])
         # Death and rebirth; increment global score and respawn
         print("[World] sprite[%d] respawn @ %s [%s] (inest=%d): %s" % (i,str(self.sprites[i,IDX_pos]),str(self.sprites[nest_i,IDX_pos]),nest_i,msg))
 
@@ -454,9 +413,9 @@ class World(ParallelEnv):
             return
 
         # Speared the target flag — checkpoint
-        if i_victim == int(self.sprites[i, IDX_flagi]):
+        if i_victim == int(self.sprites[i, IDX_tid]):
             self.sprites[i, IDX_RWD] += RWD_CHECKPOINT
-            self.sprites[i, IDX_flagi] = self._next_flag(i)
+            self.sprites[i, IDX_tid] = self._next_flag(i)
             self.sprites[i, IDX_damage] = -80
             return
 
@@ -499,33 +458,41 @@ class World(ParallelEnv):
             The index of the next flag. 
         '''
         # Index of flagged object for i-th sprite
-        i_flag = int(self.sprites[i,IDX_flagi])
+        i_flag = int(self.sprites[i,IDX_tid])
         # The 'order' of that flag 
-        o_flag = self.sprites[i_flag,IDX_flg]
+        o_flag = self.sprites[i_flag,IDX_sid]
         # The final flag 
-        o_last = max(self.sprites[:,IDX_flg]) 
+        o_last = max(self.sprites[:,IDX_sid]) 
         # Start afresh if this is the last one
         if o_flag >= o_last:
             o_flag = 0
         else:
             o_flag += 1
         # Selection
-        selection = np.where(self.sprites[0:self.i_base, IDX_flg] == o_flag)[0]
+        selection = np.where(self.sprites[0:self.i_base, IDX_sid] == o_flag)[0]
         return int(np.random.choice(selection))
 
-    def enact(self, i):
-        ''' Carry out actions for the i-th sprite.
+    def enact(self, sprite, actions):
+        ''' Carry out actions for this sprite.
 
             Recall, actions are: 
-            * self.sprites[i,IDX_RANGLE] # turn right
-            * self.sprites[i,IDX_LANGLE] # turn left
-            # self.sprites[i,IDX_FIRE]   # FUTURE/not-yet-implemented
+            * sprite[IDX_RANGLE] # turn right
+            * sprite[IDX_LANGLE] # turn left
+            # sprite[IDX_FIRE]   # FUTURE/not-yet-implemented
             
-        # TODO this function could be done simultaneously for all sprites (much faster)
+        # TODO this function could be done simultaneously for all sprites (much faster) as matrix operations.
         '''
 
-        L = self.sprites[i,IDX_LANGLE]
-        R = self.sprites[i,IDX_RANGLE]
+        # Dynamics
+        MAX_SPEED = 10          # Maximum speed in pixels/tick
+        TURN_SPEED = 0.10       # radians per frame
+        ACCEL = 0.2             # rate of speed increase
+        BRAKE_DECEL = 0.4       # stop faster when no input
+
+        sprite[IDX_ACTIONS] = actions
+
+        L = sprite[IDX_LANGLE]
+        R = sprite[IDX_RANGLE]
 
         power = L * 0.5 + R * 0.5
         target_speed = power * MAX_SPEED
@@ -534,15 +501,15 @@ class World(ParallelEnv):
 
         # Apply turning (left/right)
         if turn_delta != 0:
-            self.sprites[i,IDX_unitv] = unitv(rotate(self.sprites[i,IDX_unitv],turn_delta))
-            self.sprites[i,IDX_spear0] = rotate(self.sprites[i,IDX_unitv] * self.sprites[i,IDX_rad]*SPEAR_RATIO,-0.0) # antenna right pos
-            self.sprites[i,IDX_anten1] = rotate(self.sprites[i,IDX_unitv] * self.sprites[i,IDX_rad]*ANTENNA_RATIO,+0.3) # antenna left pos
-            self.sprites[i,IDX_anten2] = rotate(self.sprites[i,IDX_unitv] * self.sprites[i,IDX_rad]*ANTENNA_RATIO,-0.3) # antenna right pos
+            sprite[IDX_unitv] = unitv(rotate(sprite[IDX_unitv],turn_delta))
+            sprite[IDX_spear0] = rotate(sprite[IDX_unitv] * sprite[IDX_rad]*SPEAR_RATIO,-0.0) # antenna right pos
+            sprite[IDX_anten1] = rotate(sprite[IDX_unitv] * sprite[IDX_rad]*ANTENNA_RATIO,+0.3) # antenna left pos
+            sprite[IDX_anten2] = rotate(sprite[IDX_unitv] * sprite[IDX_rad]*ANTENNA_RATIO,-0.3) # antenna right pos
 
         # Get current state
-        #angle = self.sprites[i, IDX_angle]
-        speed = self.sprites[i, IDX_speed]   
-        #position = self.sprites[i, IDX_pos]
+        #angle = sprite[ IDX_angle]
+        speed = sprite[ IDX_speed]   
+        #position = sprite[ IDX_pos]
 
         # Smooth acceleration toward target speed
         if abs(speed - target_speed) < ACCEL:
@@ -553,12 +520,12 @@ class World(ParallelEnv):
             speed -= BRAKE_DECEL
 
         # Limit speed
-        self.sprites[i,IDX_speed] = np.clip(speed,0.0,MAX_SPEED)
+        sprite[IDX_speed] = np.clip(speed,0.0,MAX_SPEED)
 
         # Update self-observation
-        self.sprites[i,IDX_SPEED] = self.sprites[i,IDX_speed]/MAX_SPEED
+        sprite[IDX_SPEED] = sprite[IDX_speed]/MAX_SPEED
         # Update position
-        self.sprites[i,IDX_pos] += (self.sprites[i,IDX_unitv] * self.sprites[i,IDX_speed])
+        sprite[IDX_pos] += (sprite[IDX_unitv] * sprite[IDX_speed])
 
 
     def pos2grid(self,p):
@@ -627,16 +594,17 @@ class World(ParallelEnv):
             i_victim : int
                 sprite id (animate or inaninmate)
         '''
+        print("bump")
 
         # Bugs hurt themselves crashing into anything of positive id
         
         if self.sprites[i_victim,IDX_id] >= ID_VOID:   
             # Bumps into something
             self.sprites[i,IDX_health] -= BUMP_SIZE * abs(self.sprites[i,IDX_speed])
-        #elif i_victim == self.sprites[i,IDX_flagi]:   
+        #elif i_victim == self.sprites[i,IDX_tid]:   
         #    # Runs over the flag
         #    self.sprites[i,IDX_RWD] += RWD_CHECKPOINT
-        #    self.sprites[i,IDX_flagi] = self._next_flag(i)
+        #    self.sprites[i,IDX_tid] = self._next_flag(i)
         else:
             # FUTURE: Could have some terrain-effect here (when bug is over a certain tile),
             #         e.g., speed reduction, some kind of healing, ...
