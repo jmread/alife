@@ -5,3 +5,4 @@ IMG_DIR = os.path.join(ROOT_DIR, 'alife', 'img')
 MAP_DIR = os.path.join(ROOT_DIR, 'alife', 'maps')
 
 FPS = 6
+MAX_GRID_DETECTION = 100     # maximum number of objects that can be detected at once
