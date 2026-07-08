@@ -12,6 +12,7 @@ ID_ROCK = 1   # Blue objects
 ID_PLANT = 2  # Green objects
 ID_ANIMAL = 3 # Red objects
 
+ID_FX = -3   # Visual effect sprite (splatter/glitter) -- render only, invisible to simulation
 ID_GRASS = 666 # For future use
 ID_ORE = 777 # For future use
 
@@ -34,16 +35,18 @@ COLOR_BLACK  = (0, 0, 0)
 COLOR_YELLOW  = (255, 255, 0)
 
 # Palletes of colors for 'splatter' artwork
-PAL_BLOOD = [ (255,0,0), (178,0,0), (91,0,0), (250,50,50), (204,61,61), ]
+PAL_ANIMAL = [ (255,0,0), (178,0,0), (91,0,0), (250,50,50), (204,61,61), ]
 PAL_PLANT = [ (37, 82, 59),  (53, 136, 86), (90, 171, 97), (98, 189, 105), (48, 105, 75),  (12, 56, 35) ]
 PAL_ROCK = [(45,44,44), (58,50,50), (73,60,60), (92,73,73), (101,83,83),]
+PAL_FLAG = [(0,0,255),]
 
 # Convert ID number to splatter color
 id2pal = {
             ID_VOID : [COLOR_WHITE],
             ID_ROCK : PAL_ROCK,
             ID_PLANT : PAL_PLANT,
-            ID_ANIMAL : PAL_BLOOD,
+            ID_ANIMAL : PAL_ANIMAL,
+            ID_FLAG : PAL_FLAG,
         }
 
 # Convert (ID) number to RGB intensities 
@@ -264,14 +267,58 @@ def get_label(line, color=COLOR_RED):
     myfont = pygame.font.SysFont("monospace", 17) 
     return myfont.render(line, 0, color)
 
-def draw_state(screen, sprites, images, names): 
+N_FX_SLOTS = 20  # reserved FX rows at end of sprites array
+
+
+def _find_free_fx(sprites, n):
+    """Find a free FX slot in the reserved zone."""
+    for j in range(n - N_FX_SLOTS, n):
+        if sprites[j, IDX_id] == 0:
+            return j
+    return None
+
+
+def draw_state(screen, sprites, images, names):
     ''' Draw the full game state
     '''
     n, d = sprites.shape
+
     for i in range(n):
+
+        # Spawn splatter FX from damage marker
+        if sprites[i, IDX_damage] > 0 and sprites[i, IDX_id] != ID_FX:
+            j = _find_free_fx(sprites, n)
+            if j is not None:
+                src_id = int(sprites[i, IDX_id])
+                pos = sprites[i, IDX_pos].astype(int)
+                timer = int(sprites[i, IDX_damage])
+                sprites[j, :] = 0
+                sprites[j, IDX_id] = ID_FX
+                sprites[j, IDX_pos] = pos
+                sprites[j, IDX_health] = timer
+                sprites[j, IDX_rad] = timer + 5
+                sprites[j, IDX_img] = src_id
+                images[j] = build_splatter_img(pos, timer + 5, src_id)[1]
+            sprites[i, IDX_damage] = 0
+
+        # Spawn glitter FX from glitter marker
+        if sprites[i, IDX_glitter] > 0 and sprites[i, IDX_id] != ID_FX:
+            j = _find_free_fx(sprites, n)
+            if j is not None:
+                pos = sprites[i, IDX_pos].astype(int)
+                timer = int(sprites[i, IDX_glitter])
+                sprites[j, :] = 0
+                sprites[j, IDX_id] = ID_FX
+                sprites[j, IDX_pos] = pos
+                sprites[j, IDX_health] = timer
+                sprites[j, IDX_rad] = timer + 5
+                sprites[j, IDX_img] = ID_FLAG
+                images[j] = build_splatter_img(pos, timer + 5, ID_FLAG)[1]
+            sprites[i, IDX_glitter] = 0
+
         if sprites[i,IDX_id] == 0:
             continue
-        if sprites[i,IDX_id] == ID_ANIMAL: 
+        if sprites[i,IDX_id] == ID_ANIMAL:
             if images[i] is None: 
                 # Build the image, as it is specified
                 image = build_image_png([0,0],int(sprites[i,IDX_rad]),int(sprites[i,IDX_id]),int(sprites[i,IDX_img]))[1]
@@ -279,22 +326,23 @@ def draw_state(screen, sprites, images, names):
                 images[i] = build_image_bank(image)
             # Now draw ...
             draw_bug(screen, sprites, images[i], names, i)
+        elif sprites[i,IDX_id] == ID_FX:
+            # Draw splatter/glitter image, countdown timer, expire
+            p = sprites[i, IDX_pos].astype(int)
+            r = int(sprites[i, IDX_rad])
+            if images[i] is not None:
+                screen.blit(images[i], (p[0] - r, p[1] - r))
+            sprites[i, IDX_health] -= 1
+            if sprites[i, IDX_health] <= 0:
+                sprites[i, :] = 0
+                images[i] = None
         else:
-            # TODO as these things never move, it's a waste to draw them separately, each time...
-            # should simply draw them into the background (but... should still exist as sprites.. because they're collidable)
             if images[i] is None: 
                 # Build the image, as it is specified
                 images[i] = build_image_png([0,0],int(sprites[i,IDX_rad]),int(sprites[i,IDX_id]),int(sprites[i,IDX_img]))[1]
-            # Now draw ...
+            # Now draw ...  (TODO: what's with the images[-1]?)
             draw_obj(screen, sprites[i], images[i], images[-1])
 
-    # Draw splatter
-    #for img in images[-1]:
-    #    screen.blit(image, p - r)
-
-    #if sprite[IDX_damage] < 0:
-    #    # find free index
-    #    image[?] = build_splatter_img(pos,rad,id)
 
 from .utils import rotate, angle_deg
 
@@ -350,8 +398,6 @@ def draw_bug(screen, sprites, images, names, i, p=None):
     #name_label = get_label("%s.%d@%d" % (self.name,self.ssID,self.energy))
     screen.blit(get_label("%s" % name), p)
 
-    # Splatter
-    draw_splatter(screen, sprites[i], None, False)
 
 def draw_obj(screen, sprite, image, debug=False):
 
@@ -360,23 +406,6 @@ def draw_obj(screen, sprite, image, debug=False):
     screen.blit(image, p - r)
     if debug:
         pygame.draw.circle(screen, COLOR_WHITE, sprite[IDX_pos].astype(int), int(sprite[IDX_rad]) + 3, 4)
-        # TODO draw splatter
-        #screen.blit(get_label("%s" % str(p)), p)
-
-    if sprite[IDX_damage] < 0:
-        # TODO make splatter
-        sprite[IDX_damage] = 0
-
-
-def draw_splatter(screen, sprite, image, debug=False):
-
-    if sprite[IDX_damage] < 0:
-       sprite[IDX_damage] = -sprite[IDX_damage]
-       # TODO create an image file of splatter, store it somewhere
-    if sprite[IDX_damage] > 0:
-        pygame.draw.circle(screen, COLOR_YELLOW, sprite[IDX_pos].astype(int), int(sprite[IDX_damage] + 5), 4)
-        # Countdown
-        sprite[IDX_damage] -= 1
 
 def draw_banner(surface, s, max_txt='--------------------', align='l'):
     '''
