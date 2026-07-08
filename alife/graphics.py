@@ -3,7 +3,7 @@ import numpy as np
 import random
 import os
 from PIL import Image, ImageDraw, ImageFont
-from config import IMG_DIR
+from .config import IMG_DIR
  
 # Types of Sprites/Things/Objects
 ID_FLAG = -1  # A flag/nest is something which has no physical presence (i.e., not directly visible or collidable to sprites) but is drawn, and some game logic may be associated.

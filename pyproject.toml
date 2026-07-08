@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alife"
+version = "0.1.0"
+description = "PettingZoo artificial-life environment"
+dependencies = [
+    "Pillow",
+    "pettingzoo>=1.24.0",
+    "pygame>=2.1.0",
+    "gymnasium>=0.29.0",
+    "numpy>=1.21.0",
+    "scipy",
+]
+
+[tool.setuptools.packages.find]
+include = ["alife*"]
+
+[tool.setuptools.package-data]
+alife = ["img/*", "maps/*"]

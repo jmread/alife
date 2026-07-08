@@ -18,7 +18,7 @@ import pygame
 
 from .utils import rotate, cos_sim, unitv, slide_off
 from .graphics import id2rgb, ID_FLAG, ID_VOID, ID_FX, ID_ANIMAL, ID_ROCK, ID_PLANT, build_bg_png as build_map, draw_state
-from config import MAP_DIR, FPS
+from .config import MAP_DIR, FPS
 
 print("[World] Setting parameters")
 from .constants import *
