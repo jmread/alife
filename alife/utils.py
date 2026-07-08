@@ -1,17 +1,18 @@
 import numpy as np
-from numpy.linalg import norm
+import math
+
 
 def collision(p1, r1, p2, r2):
     ''' Circle-circle collision.
 
-        Collision information from circle (p1,r1) with circle (p2,r2). 
+        Collision information from circle (p1,r1) with circle (p2,r2).
 
-        Returns 
+        Returns
         -------
 
         vdiff : array-like (2d)
             the vector specifying the direction
-            
+
         overlap : float
             the amount of overlap (negative distance, if there is no overlap)
 
@@ -19,15 +20,9 @@ def collision(p1, r1, p2, r2):
             the distance between the two objects
     '''
 
-    # The vector between the objects
     v_diff = p1 - p2
-
-    # The length between the objects
-    d = max(norm(v_diff),0.01)
-
-    # Calculate the overlap (sum of radii - distance between centers)
-    overlap = (r1 + r2) - d 
-
+    d = max(math.sqrt(float(v_diff[0])**2 + float(v_diff[1])**2), 0.01)
+    overlap = (r1 + r2) - d
     return v_diff, overlap, d
 
 def overlap(p1, r1, p2, r2):
@@ -52,7 +47,7 @@ def rotate(v, theta=0.1):
 
 def unitv(v):
     ''' unit vector of v '''
-    d = norm(v)
+    d = math.sqrt(float(v[0])**2 + float(v[1])**2)
     if d == 0:
         return np.array([0., 1.])
     return v / d
@@ -65,9 +60,11 @@ def angle_deg(v):
     return a
 
 def cos_sim(v1,v2):
-    ''' cosine similarity: the cosine of the angle between v1 and v2 
+    ''' cosine similarity: the cosine of the angle between v1 and v2
     (not necessarily normalized -- we do it here)'''
-    return np.dot(v1,v2)/(norm(v1)*norm(v2))
+    n1 = math.sqrt(float(v1[0])**2 + float(v1[1])**2)
+    n2 = math.sqrt(float(v2[0])**2 + float(v2[1])**2)
+    return np.dot(v1,v2)/(n1*n2)
 
 def get_centres(n_row,n_col,tile_size): 
     ''' returns a numpy array M of shape (n_row,n_col,2) where M[i,j] returns 
