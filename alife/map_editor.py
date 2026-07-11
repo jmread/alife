@@ -2,6 +2,7 @@
 
 import sys
 import time
+import warnings
 
 # Numpy
 import numpy as np
@@ -14,7 +15,7 @@ from .graphics import N_array, COLOR_WHITE, get_label
 from .graphics import build_image_bank, build_bg_png as build_map, build_image_png, ID_ROCK, ID_PLANT, ID_ANIMAL, ID_FLAG, f_array
 from .constants import IDX_id, IDX_x, IDX_y, IDX_pos, IDX_rad, IDX_img, IDX_sid
 from .config import MAP_DIR, MAP_ROWS, MAP_COLS, DEFAULT_MAP_NAME
-from .map_generator import generate_map, generate_terrain
+from .map_generator import generate_map
 from pathlib import Path
 
 GRID_SIZE = 64              # tile size (width and height, in pixels)
@@ -58,6 +59,18 @@ def get_object(sprites, p):
             return i, sprite
     return -1, None
 
+def strip_map_ext(name):
+    """Strip a known map-file extension (.map/.csv/.dat/.png) if present."""
+    for ext in ('.map', '.csv', '.dat', '.png'):
+        if name.endswith(ext):
+            return name[:-len(ext)]
+    return name
+
+def map_name_taken(name):
+    """Return True if name.map or name.csv already exists in MAP_DIR."""
+    d = Path(MAP_DIR)
+    return (d / (name + '.map')).exists() or (d / (name + '.csv')).exists()
+
 def editor_interface(world_info):
 
     '''
@@ -70,10 +83,15 @@ def editor_interface(world_info):
     bname_map = world_info['basename']
     fname_sprites = str(Path(MAP_DIR) / (bname_map+'.csv'))
     fname_map = str(Path(MAP_DIR) / (bname_map+'.map'))
+    fname_png = str(Path(MAP_DIR) / (bname_map+'.png'))
 
     # Build the map (based on world_name)
     print('[Map-Editor] Got world info: (map: %s).' % (fname_map))
-    B = np.genfromtxt(fname_map, dtype=int, delimiter=1, filling_values=0)
+    try:
+        B = np.genfromtxt(fname_map, dtype=int, delimiter=1, filling_values=0)
+    except Exception as e:
+        print("[Map-Editor] That map ('%s') did not exist, so we're going to generate one." % (fname_map))
+        B = generate_map(MAP_ROWS, MAP_COLS)
     WIDTH = (B.shape[1]-1) * GRID_SIZE * 2
     HEIGHT = (B.shape[0]-1) * GRID_SIZE * 2
     background, terrain = build_map(B,grid_lines=True)
@@ -92,22 +110,26 @@ def editor_interface(world_info):
     pygame.display.flip()
 
     #image = build_image_png([0,0],int(sprites[i,IDX_rad]),int(sprites[i,IDX_id]),int(sprites[i,IDX_img]))[1]
-    sprites = np.empty((0, 6))  
+    sprites = np.empty((0, 6), dtype=int)  
 
     try:
         print("[World] Load Sprites ..")
-        sprites = np.atleast_2d(np.loadtxt(fname_sprites,delimiter=',',dtype=int))
-        # Check for correct number of columns
-        if sprites.shape[1] == 5:
-            # Add a sixth column of -1
-            sprites = np.hstack([sprites, -1 * np.ones((sprites.shape[0], 1), dtype=int)])
-            # For rows where the first column is -1, set first column to 0 and sixth column to 3
-            mask = sprites[:, 0] == -1
-            sprites[mask, 5] = 3
-            # Replace any remaining -1 in the first column with 0
-            #sprites[sprites[:, 0] == -1, 0] = -1
-        elif sprites.shape[1] != 6:
-            raise ValueError("Input file must have 5 or 6 columns")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            loaded = np.loadtxt(fname_sprites,delimiter=',',dtype=int)
+        if loaded.size == 0:
+            print("[World] No sprites in file; starting with an empty map.")
+        else:
+            sprites = np.atleast_2d(loaded)
+            # Check for correct number of columns
+            if sprites.shape[1] == 5:
+                # Add a sixth column of -1
+                sprites = np.hstack([sprites, -1 * np.ones((sprites.shape[0], 1), dtype=int)])
+                # For rows where the first column is -1, set first column to 0 and sixth column to 3
+                mask = sprites[:, 0] == -1
+                sprites[mask, 5] = 3
+            elif sprites.shape[1] != 6:
+                raise ValueError("Input file must have 5 or 6 columns")
     except Exception as e:
         print("[World] Error: ", type(e).__name__, e)
         #print("      > No sprite file found; creating a default flag sprite...")
@@ -150,6 +172,9 @@ def editor_interface(world_info):
                 if event.key == pygame.K_s: 
                     print(sprites)
                     np.savetxt(fname_sprites, sprites, delimiter=',',fmt='%d')
+                    np.savetxt(fname_map, B, fmt="%d", delimiter="")
+                    pygame.image.save(background, fname_png)
+                    print("[Map-Editor] Saved %s, %s, %s" % (fname_map, fname_sprites, fname_png))
                 if event.key == pygame.K_h:
                     show_help = not show_help
                 if event.key == pygame.K_r: 
@@ -172,10 +197,9 @@ def editor_interface(world_info):
                     images[len(sprites)-1] = build_image_png(sprite[IDX_pos],sprite[IDX_rad],sprite[IDX_id],sprite[IDX_img])[1]
                 if event.key == pygame.K_g:
                     if sprites.shape[0] == 0:
-                        B = generate_terrain(grid_rows, grid_cols)
-                        np.savetxt(fname_map, B, fmt="%d", delimiter="")
+                        B = generate_map(grid_rows, grid_cols)
                         background, terrain = build_map(B, grid_lines=True)
-                        print("[Map-Editor] Terrain re-rolled")
+                        print("[Map-Editor] Terrain re-rolled (press s to save)")
                     else:
                         print("[Map-Editor] Cannot re-roll terrain after sprites have been placed")
                         print(sprites)
@@ -191,13 +215,12 @@ def editor_interface(world_info):
                         new_cols = max(grid_cols - 2, 4)
                     if (new_rows, new_cols) != (grid_rows, grid_cols):
                         grid_rows, grid_cols = new_rows, new_cols
-                        B = generate_terrain(grid_rows, grid_cols)
-                        np.savetxt(fname_map, B, fmt="%d", delimiter="")
+                        B = generate_map(grid_rows, grid_cols)
                         background, terrain = build_map(B, grid_lines=True)
                         WIDTH = (grid_cols - 1) * GRID_SIZE * 2
                         HEIGHT = (grid_rows - 1) * GRID_SIZE * 2
                         screen = pygame.display.set_mode((WIDTH, HEIGHT))
-                        print("[Map-Editor] Resized terrain to %dx%d" % (grid_rows, grid_cols))
+                        print("[Map-Editor] Resized terrain to %dx%d (press s to save)" % (grid_rows, grid_cols))
                 if selected_sprite is not None:
                     if event.key == pygame.K_DELETE:
                         if selected_sprite is not None:
@@ -298,19 +321,18 @@ def prompt_for_new_map():
     """Prompt the terminal for a map name; reject names that already exist."""
     while True:
         name = input("Map name [%s]: " % DEFAULT_MAP_NAME) or DEFAULT_MAP_NAME
-        map_path = Path(MAP_DIR) / (name + ".map")
-        if not map_path.exists():
+        name = strip_map_ext(name)
+        if not map_name_taken(name):
             return name
-        print("[Map-Editor] '%s' already exists (%s); choose another name." % (name, map_path))
+        print("[Map-Editor] '%s' already exists; choose another name." % name)
 
 
 if __name__ == "__main__":
     if len(sys.argv) >= 2:
-        basename = sys.argv[1][0:-4]
+        basename = strip_map_ext(sys.argv[1])
     else:
         print("[Map-Editor] No map specified -- generating a new one.")
         basename = prompt_for_new_map()
-        generate_map(basename, MAP_ROWS, MAP_COLS)
 
     editor_interface(world_info={'basename': basename})
 

@@ -14,15 +14,9 @@ NOTES:
     1 is land (so, [11;11] is all land)
 """
 
-import sys
-from pathlib import Path
-
 import numpy as np
 
-from .config import MAP_DIR
-from .graphics import draw_map
 from .map_tools import pad
-
 
 def generate_island(n_rows, n_cols, land_prob=0.65, iterations=5):
     # Initialize random binary matrix
@@ -45,45 +39,15 @@ def generate_island(n_rows, n_cols, land_prob=0.65, iterations=5):
     return grid
 
 
-def generate_terrain(n_rows, n_cols):
+def generate_map(n_rows, n_cols):
     """Generate an island bitmap padded with a sea border; shape is (n_rows, n_cols)."""
-    B = generate_island(n_rows - 2, n_cols - 2, iterations=1)
-    B = pad(B, 0)
-    return B
-
-
-def generate_map(map_name, n_rows, n_cols, show=False):
-    """Generate a random map and save it to MAP_DIR/<map_name>.map. Returns the path."""
     assert n_rows % 2 == 0, f"{n_rows} is not an even number"
     assert n_cols % 2 == 0, f"{n_cols} is not an even number"
     assert n_rows >= 4
     assert n_cols >= 4
 
-    B = generate_terrain(n_rows, n_cols)
-    path = Path(MAP_DIR) / f"{map_name}.map"
-    np.savetxt(path, B, fmt="%d", delimiter="")
-
-    print(f"Creating {n_rows}x{n_cols} map: {path}")
-    print(B)
-
-    if show:
-        final_map, _ = draw_map(B)
-        final_map.show()
-    return path
+    B = generate_island(n_rows - 2, n_cols - 2, iterations=1)
+    B = pad(B, 0)
+    return B
 
 
-def print_usage():
-    """Print clean usage information"""
-    print("""Usage: python3 map_generator.py <mapname> <height> <width>
-Example:
-  python3 map_generator.py forest 20 30""")
-
-
-if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print_usage()
-        sys.exit(1)
-    map_name = sys.argv[1]
-    n_rows = int(sys.argv[2])
-    n_cols = int(sys.argv[3])
-    generate_map(map_name, n_rows, n_cols, show=True)

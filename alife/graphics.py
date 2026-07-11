@@ -11,14 +11,14 @@ ID_VOID = 0   # Not anything; a colorless objects (not visible to bugs) nor any 
 ID_ROCK = 1   # Blue objects
 ID_PLANT = 2  # Green objects
 ID_ANIMAL = 3 # Red objects
-
 ID_FX = -3   # Visual effect sprite (splatter/glitter) -- render only, invisible to simulation
+
 ID_GRASS = 666 # For future use
 ID_ORE = 777 # For future use
 
 # How many types of image are there for each .. 
 # TODO Discover dynamically 
-N_ROCKS = 10
+N_ROCKS = 15
 N_TREES = 47
 N_BUGS = 7
 N_FLAGS = 4
@@ -38,7 +38,7 @@ COLOR_YELLOW  = (255, 255, 0)
 PAL_ANIMAL = [ (255,0,0), (178,0,0), (91,0,0), (250,50,50), (204,61,61), ]
 PAL_PLANT = [ (37, 82, 59),  (53, 136, 86), (90, 171, 97), (98, 189, 105), (48, 105, 75),  (12, 56, 35) ]
 PAL_ROCK = [(45,44,44), (58,50,50), (73,60,60), (92,73,73), (101,83,83),]
-PAL_FLAG = [(0,0,255),]
+PAL_FLAG = [(255, 215, 0),(207, 181, 59),(255, 201, 14),(255, 248, 200),(255, 215, 100)]
 
 # Convert ID number to splatter color
 id2pal = {
@@ -226,12 +226,18 @@ def draw_map(B, tile_size=128, grid_lines=False):
                 if T[i, j] == 1:
                     center_x = (j + 0.5) * step  # Middle of the grid square
                     center_y = (i + 0.5) * step  # Middle of the grid square
-                    draw.ellipse(
-                        [(center_x - circle_radius, center_y - circle_radius),
-                         (center_x + circle_radius, center_y + circle_radius)],
-                        fill="red"
-                    )
-
+                    draw.line(
+                            [(center_x - circle_radius, center_y - circle_radius),
+                             (center_x + circle_radius, center_y + circle_radius)],
+                            fill="grey",
+                            width=2
+                            )
+                    draw.line(
+                            [(center_x + circle_radius, center_y - circle_radius),
+                             (center_x - circle_radius, center_y + circle_radius)],
+                            fill="grey",
+                            width=2
+                            )
 
     return final_map, T
 
@@ -268,7 +274,6 @@ def get_label(line, color=COLOR_RED):
     return myfont.render(line, 0, color)
 
 N_FX_SLOTS = 20  # reserved FX rows at end of sprites array
-
 
 def _find_free_fx(sprites, n):
     """Find a free FX slot in the reserved zone."""
