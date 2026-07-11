@@ -13,6 +13,9 @@ import pygame
 from .graphics import N_array, COLOR_WHITE, get_label
 from .graphics import build_image_bank, build_bg_png as build_map, build_image_png, ID_ROCK, ID_PLANT, ID_ANIMAL, ID_FLAG, f_array
 from .constants import IDX_id, IDX_x, IDX_y, IDX_pos, IDX_rad, IDX_img, IDX_sid
+from .config import MAP_DIR, MAP_ROWS, MAP_COLS, DEFAULT_MAP_NAME
+from .map_generator import generate_map, generate_terrain
+from pathlib import Path
 
 GRID_SIZE = 64              # tile size (width and height, in pixels)
 
@@ -30,6 +33,9 @@ HELP_LINES = [
     "1-8, 0    Set flag label",
     "f         Clear flag label",
     "s         Save to file",
+    "g         Re-roll terrain (empty maps only)",
+    "Shift+UP/DOWN   Grow/shrink rows x2 (empty maps)",
+    "Shift+LEFT/RIGHT Grow/shrink cols x2 (empty maps)",
 ]
 
 def pos2grid(p, TILE_SIZE=64):
@@ -62,8 +68,8 @@ def editor_interface(world_info):
 
     # Extract info
     bname_map = world_info['basename']
-    fname_sprites = bname_map+'.csv'
-    fname_map = bname_map+'.map'
+    fname_sprites = str(Path(MAP_DIR) / (bname_map+'.csv'))
+    fname_map = str(Path(MAP_DIR) / (bname_map+'.map'))
 
     # Build the map (based on world_name)
     print('[Map-Editor] Got world info: (map: %s).' % (fname_map))
@@ -71,10 +77,13 @@ def editor_interface(world_info):
     WIDTH = (B.shape[1]-1) * GRID_SIZE * 2
     HEIGHT = (B.shape[0]-1) * GRID_SIZE * 2
     background, terrain = build_map(B,grid_lines=True)
+    grid_rows, grid_cols = B.shape
 
-    # Open the sreen 
+    # Open the sreen
     pygame.font.init()
-    pygame.display.set_caption("Map Editor [map: %s]" % fname_map)
+    help_font = pygame.font.SysFont("monospace", 28)
+    hint_font = pygame.font.SysFont("monospace", 18)
+    pygame.display.set_caption("Map Editor [map: %s.map]" % bname_map)
     screen = pygame.display.set_mode((WIDTH, HEIGHT))#, HWSURFACE|DOUBLEBUF)
     pygame.mouse.set_visible(1)
 
@@ -83,7 +92,7 @@ def editor_interface(world_info):
     pygame.display.flip()
 
     #image = build_image_png([0,0],int(sprites[i,IDX_rad]),int(sprites[i,IDX_id]),int(sprites[i,IDX_img]))[1]
-    sprites = []
+    sprites = np.empty((0, 6))  
 
     try:
         print("[World] Load Sprites ..")
@@ -101,10 +110,8 @@ def editor_interface(world_info):
             raise ValueError("Input file must have 5 or 6 columns")
     except Exception as e:
         print("[World] Error: ", type(e).__name__, e)
-        print("      > No sprite file found; creating a default flag sprite...")
-        sprites = np.array([ID_FLAG, GRID_SIZE*2, GRID_SIZE*2, 15, 0, -1]).reshape(1,-1)
-
-    print(sprites)
+        #print("      > No sprite file found; creating a default flag sprite...")
+        #sprites = np.array([ID_FLAG, GRID_SIZE*2, GRID_SIZE*2, 15, 0, -1]).reshape(1,-1)
 
     show_help = False
 
@@ -163,6 +170,34 @@ def editor_interface(world_info):
                     sprite = np.array([ID_FLAG, pos[0], pos[1], 20, int(np.random.choice(N_array[ID_FLAG])), -1])
                     sprites = np.vstack([sprites, sprite])
                     images[len(sprites)-1] = build_image_png(sprite[IDX_pos],sprite[IDX_rad],sprite[IDX_id],sprite[IDX_img])[1]
+                if event.key == pygame.K_g:
+                    if sprites.shape[0] == 0:
+                        B = generate_terrain(grid_rows, grid_cols)
+                        np.savetxt(fname_map, B, fmt="%d", delimiter="")
+                        background, terrain = build_map(B, grid_lines=True)
+                        print("[Map-Editor] Terrain re-rolled")
+                    else:
+                        print("[Map-Editor] Cannot re-roll terrain after sprites have been placed")
+                        print(sprites)
+                if (event.mod & pygame.KMOD_SHIFT) and sprites.shape[0] == 0:
+                    new_rows, new_cols = grid_rows, grid_cols
+                    if event.key == pygame.K_UP:
+                        new_rows = grid_rows + 2
+                    elif event.key == pygame.K_DOWN:
+                        new_rows = max(grid_rows - 2, 4)
+                    elif event.key == pygame.K_RIGHT:
+                        new_cols = grid_cols + 2
+                    elif event.key == pygame.K_LEFT:
+                        new_cols = max(grid_cols - 2, 4)
+                    if (new_rows, new_cols) != (grid_rows, grid_cols):
+                        grid_rows, grid_cols = new_rows, new_cols
+                        B = generate_terrain(grid_rows, grid_cols)
+                        np.savetxt(fname_map, B, fmt="%d", delimiter="")
+                        background, terrain = build_map(B, grid_lines=True)
+                        WIDTH = (grid_cols - 1) * GRID_SIZE * 2
+                        HEIGHT = (grid_rows - 1) * GRID_SIZE * 2
+                        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+                        print("[Map-Editor] Resized terrain to %dx%d" % (grid_rows, grid_cols))
                 if selected_sprite is not None:
                     if event.key == pygame.K_DELETE:
                         if selected_sprite is not None:
@@ -240,23 +275,42 @@ def editor_interface(world_info):
             if selected_sprite is not None:
                 pygame.draw.circle(screen, COLOR_WHITE, selected_sprite[IDX_pos], selected_sprite[IDX_rad] + 3, 4)
 
+            hint = hint_font.render("Press h for help", True, COLOR_WHITE)
+            screen.blit(hint, (WIDTH - hint.get_width() - 12, HEIGHT - hint.get_height() - 12))
+
             if show_help:
-                help_font = pygame.font.SysFont("monospace", 24)
+                line_h = help_font.get_height() + 6
+                box_w = max(help_font.size(line)[0] for line in HELP_LINES) + 30
+                box_h = line_h * len(HELP_LINES) + 20
+                box = pygame.Surface((box_w, box_h), pygame.SRCALPHA)
+                box.fill((0, 0, 0, 180))
+                screen.blit(box, (10, 10))
                 for i, line in enumerate(HELP_LINES):
-                    label = help_font.render(line, 0, COLOR_WHITE)
-                    screen.blit(label, (10, 10 + i * 20))
+                    label = help_font.render(line, True, COLOR_WHITE)
+                    screen.blit(label, (25, 20 + i * line_h))
 
             pygame.display.flip()
 
         #time.sleep(1)
 
 
-import sys
+def prompt_for_new_map():
+    """Prompt the terminal for a map name; reject names that already exist."""
+    while True:
+        name = input("Map name [%s]: " % DEFAULT_MAP_NAME) or DEFAULT_MAP_NAME
+        map_path = Path(MAP_DIR) / (name + ".map")
+        if not map_path.exists():
+            return name
+        print("[Map-Editor] '%s' already exists (%s); choose another name." % (name, map_path))
 
-if len(sys.argv) < 2:
-    print("Usage: map_editor <map_name.dat>\n\tPlease specify map name")
-    exit(1)
 
-filename = sys.argv[1]
-editor_interface(world_info = { 'basename' : filename[0:-4] })
+if __name__ == "__main__":
+    if len(sys.argv) >= 2:
+        basename = sys.argv[1][0:-4]
+    else:
+        print("[Map-Editor] No map specified -- generating a new one.")
+        basename = prompt_for_new_map()
+        generate_map(basename, MAP_ROWS, MAP_COLS)
+
+    editor_interface(world_info={'basename': basename})
 
