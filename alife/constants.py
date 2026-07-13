@@ -33,8 +33,8 @@ IDX_unitv = [IDX_vx, IDX_vy]   # float
 IDX_health = 14                # int : between 0 and MAX_HEALTH
 IDX_speed = 15                 # int : internal state speed 
 IDX_tid = 16                   # int : targit id; points to the id (array index) of the sprite that this sprite should look for/target
+IDX_aid = 17                   # int : attachment id (future use)
 
-IDX_unused = 17                # float : unused
 IDX_glitter = 18               # float : glitter
 IDX_damage = 19                # int : for tracking external splatter
 
@@ -44,9 +44,9 @@ IDX_PROXIMITY = 21              # (OBS) between 0 and 1 (nb actually currently c
 IDX_PROBE1 = [22,23,24]         # (OBS) int : between [0,0,0] and [1,1,1] (indicating 3-channel color intensity)
 IDX_PROBE2 = [25,26,27]         # (OBS) int : between [0,0,0] and [1,1,1] (indicating 3-channel color intensity)
 IDX_ENERGY = 28                 # (OBS) between 0 and 1, an observation of IDX_health
-IDX_FLAG = 29                   # (OBS) how close are we pointing to the flag (1 <=> exact angle, 0 <=> > 90 degrees) 
+IDX_COMPASS = 29                   # (OBS) how close are we pointing to the flag (1 <=> exact angle, 0 <=> > 90 degrees) 
 IDX_SPEED = 30                  # (OBS) normalised speed
-IDX_OBS = [IDX_COLIDE, IDX_PROXIMITY] + IDX_PROBE1 + IDX_PROBE2 + [IDX_ENERGY,IDX_FLAG,IDX_SPEED]
+IDX_OBS = [IDX_COLIDE, IDX_PROXIMITY] + IDX_PROBE1 + IDX_PROBE2 + [IDX_ENERGY,IDX_COMPASS,IDX_SPEED]
 d_S = len(IDX_OBS)
 
 ## ACTION (all between -1 and +1)

@@ -17,7 +17,8 @@ from scipy.ndimage import distance_transform_edt
 import pygame
 
 from .utils import rotate, cos_sim, unitv, slide_off
-from .graphics import id2rgb, ID_FLAG, ID_VOID, ID_FX, ID_ANIMAL, ID_ROCK, ID_PLANT, build_bg_png as build_map, draw_state
+from .graphics import id2rgb, ID_FLAG, ID_ANIMAL, ID_ROCK, ID_PLANT, build_bg_png as build_map, build_image_png, draw_state
+from .map_tools import convert_to_tiles
 from .config import MAP_DIR, FPS
 
 print("[World] Setting parameters")
@@ -76,68 +77,67 @@ class World(ParallelEnv):
     def action_space(self, agent):
         return self.action_spaces[agent]
 
-    def _init_pygame(self, bname_map):
-        """Initialize pygame window. Safe to call multiple times."""
-        if self._screen is not None:
-            return
-
-        ## MAP ## 
-
-        fname_map = os.path.join(MAP_DIR, bname_map+'.map')
-
-        # Load map and get its dimensions
-        B = np.genfromtxt(fname_map, dtype=int, delimiter=1, filling_values=0)
-        WIDTH = (B.shape[1]-1) * TILE_SIZE * 2
-        HEIGHT = (B.shape[0]-1) * TILE_SIZE * 2
-        print("[World] Loaded map")
+    def _init_pygame(self, title, B, decor):
+        """Initialize pygame window and burn decor into background. Safe to call multiple times."""
 
         ## SCREEN ##
 
-        pygame.init()
-        pygame.display.set_caption("Bug World [map: %s]" % fname_map)
-        self._screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        self._clock = pygame.time.Clock()
-        self._font  = pygame.font.SysFont(None, 24)
+        if self._screen is None:
+            WIDTH = (B.shape[1]-1) * TILE_SIZE * 2
+            HEIGHT = (B.shape[0]-1) * TILE_SIZE * 2
+            print("[World] Loaded map")
+            pygame.init()
+            pygame.display.set_caption(title)
+            self._screen = pygame.display.set_mode((WIDTH, HEIGHT))
+            self._clock = pygame.time.Clock()
+            self._font  = pygame.font.SysFont(None, 24)
+            # For storing sprite images (rendering only) -- extra entries for FX sprites
+            self.images = [None for _ in range(N_SPRITE + 1)]
 
-        ## GRAPHICS ## 
+        ## BACKGROUND ##
 
-        # Render the map
-        self.background, self.terrain = build_map(B, grid_lines=False)
+        self.background, _ = build_map(B, grid_lines=False)
+
+        ## BURN DECOR ##
+
+        for sprite in decor:
+            rect, img = build_image_png(sprite[IDX_pos], int(sprite[IDX_rad]), int(sprite[IDX_id]), int(sprite[IDX_img]))
+            self.background.blit(img, rect)
 
         # Draw the background on the screen
         self._screen.blit(self.background, [0, 0])
         pygame.display.flip()
 
-        # For storing sprite images (rendering only) -- extra entries for FX sprites
-        self.images = [None for _ in range(N_SPRITE + 1)]
-
     def reset(self, seed=None, options={'map_name' : "new_4"}):
         ''' Reset the environment (state).
         '''
 
-        ## LOAD MAP AND ASSOCIATED SPRITE DATA
+        ## LOAD MAP
         bname_map = options['map_name']
-
-        ## PYGAME STUFF
-
-        if self.render_mode == "human":
-            self._init_pygame(bname_map)
+        fname_map = os.path.join(MAP_DIR, bname_map+'.map')
+        B = np.genfromtxt(fname_map, dtype=int, delimiter=1, filling_values=0)
+        _, self.terrain = convert_to_tiles(B)
 
         self.agents = []
         self.active_agents = []
         self.t   = 0
 
-        ## GRID REGISTER and GRID COUNT 
+        ## GRID REGISTER and GRID COUNT
 
         # Name register
         self.names = ["" for _ in range(N_SPRITE)]
-        # Sprite register for creatures 
+        # Sprite register for creatures
         self.sprites = np.zeros((N_SPRITE, D_SPRITE), dtype=np.float32)
 
-        # Sprite and grid register for rocks and plants (and nest and flag)
+        # Load sprites (sorts by id, separates decor for burn-in)
         fname_sprites = os.path.join(MAP_DIR, bname_map+'.csv')
-        self.i_base = self.load_sprites(fname_sprites)
-        print("[World] Loaded %d inanimate sprites" % self.i_base)
+        self.i_base, decor = self.load_sprites(fname_sprites)
+        print("[World] Loaded %d inanimate sprites (%d decor)" % (self.i_base, len(decor)))
+
+        ## PYGAME STUFF (burn decor into background, display)
+
+        if self.render_mode == "human":
+            self._init_pygame(bname_map, B, decor)
 
 
         ## PRE-COMPUTATION ##
@@ -216,7 +216,7 @@ class World(ParallelEnv):
         self.sprites[self.active_agents, IDX_done] = 0
         self.sprites[self.active_agents, IDX_RWD] = 0
 
-        # Apply actions and move sprites
+        # Apply actions and move sprites according to dynamics
         for i in self.active_agents:
             self.enact(self.sprites[i], actions[i])
 
@@ -228,8 +228,11 @@ class World(ParallelEnv):
         query_r = OUTER_RADIUS + TILE_SIZE
         for i in self.active_agents:
             neighbors = self._tree.query_ball_point(self.sprites[i, IDX_pos], query_r)
+            # Check for instant death (inside of cliffs/water)
             self._resolve_terrain(i)
+            # Check for collisions
             self._resolve_body(i, neighbors)
+            # Check for spearing
             self._resolve_combat(i, neighbors)
 
         # Death check
@@ -255,8 +258,11 @@ class World(ParallelEnv):
         query_r = OUTER_RADIUS + TILE_SIZE
         for i in self.active_agents:
             neighbors = self._tree.query_ball_point(self.sprites[i, IDX_pos], query_r)
+            # Wall-observations
             self._sense_terrain(i)
+            # Touching observations
             self._sense_body(i, neighbors)
+            # Antennae observations
             self._sense_antennae(i, neighbors)
             self.do_flag_check(i)
 
@@ -343,7 +349,9 @@ class World(ParallelEnv):
         '''
             Load inanimate sprites from file.
 
-            Populate self.sprites with rocks and plants, put up the nest and set the flag.
+            Sprites are sorted by id (flags, then rocks, then plants).
+            Decor flags (id=ID_FLAG, sid<0) are separated out for background
+            burn-in and not stored in the sprite array.
 
 
             Parameters
@@ -356,12 +364,13 @@ class World(ParallelEnv):
             Returns
             -------
 
-            int
-                the number of inanimate sprites loaded 
-                
+            (int, list)
+                the number of inanimate sprites loaded, and a list of decor
+                sprite rows to be burned into the background.
+
         '''
-        # Load data from the file 
-        try: 
+        # Load data from the file
+        try:
             print("[World] Load Sprites ..")
             things = np.atleast_2d(np.loadtxt(fname,delimiter=',',dtype=int))
         except:
@@ -369,22 +378,32 @@ class World(ParallelEnv):
             print("      > No sprite file found...")
             raise SystemExit
 
-        for i,thing in enumerate(things): 
-            self.sprites[i,DISK_INDICES] = thing[DISK_INDICES]
-            # Verify sprite is not on a wall tile
-            j, k = self.pos2grid(self.sprites[i,IDX_pos])
-            assert self.terrain[j,k] == 0
+        # Sort by id: flags(-1) first, then rocks(1), then plants(2)
+        sort_idx = np.argsort(things[:, IDX_id])
+        things = things[sort_idx]
 
-        # Set the end of the inanimate objects
-        return len(things)
+        # Populate sprites, separating decor for background burn-in
+        decor = []
+        j = 0
+        for thing in things:
+            if thing[IDX_id] == ID_FLAG and thing[IDX_sid] < 0:
+                decor.append(thing)
+                continue
+            self.sprites[j, DISK_INDICES] = thing[DISK_INDICES]
+            # Verify sprite is not on a wall tile
+            r, c = self.pos2grid(self.sprites[j, IDX_pos])
+            assert self.terrain[r, c] == 0
+            j += 1
+
+        return j, decor
 
     def do_flag_check(self,i):
 
         # This is the index of the flagged object we're chasing
-        i_FLAG = int(self.sprites[i,IDX_tid])
+        i_target = int(self.sprites[i,IDX_tid])
         # Check which way we're pointing
-        flag_angle = cos_sim(self.sprites[i,IDX_unitv],self.sprites[i,IDX_pos] - self.sprites[i_FLAG,IDX_pos]) 
-        self.sprites[i,IDX_FLAG] = flag_angle * -1*(flag_angle <= 0)
+        flag_angle = cos_sim(self.sprites[i,IDX_unitv],self.sprites[i,IDX_pos] - self.sprites[i_target,IDX_pos]) 
+        self.sprites[i,IDX_COMPASS] = flag_angle * -1*(flag_angle <= self.sprites[i,IDX_COMPASS])
 
 
     def respawn(self, i, rwd_T=RWD_DEATH, done=1, msg=""):
@@ -392,13 +411,13 @@ class World(ParallelEnv):
         self.sprites[i,IDX_RWD] += rwd_T
         self.sprites[i,IDX_done] = done
         # Choose a random nest-position to start at (nests are at flags with sub-id of 0)
-        nest_i = int(np.random.choice(np.where((self.sprites[:, IDX_id] == ID_FLAG) & (self.sprites[:, IDX_sid] == 0))[0]))
+        nest_i = int(np.random.choice(np.where(self.sprites[0:self.i_base, IDX_sid] == 0)[0]))
         self.sprites[i,IDX_pos] = self.sprites[nest_i, IDX_pos]
         self.sprites[i,IDX_unitv] = unitv(rotate(self.sprites[i,IDX_unitv],np.random.randn()*np.radians(360)))
         # Start from scratch
         self.sprites[i,IDX_speed] = 0
         # Choose a random first flag
-        self.sprites[i,IDX_tid] = np.random.choice(np.where(self.sprites[:, IDX_sid] == 1)[0])
+        self.sprites[i,IDX_tid] = np.random.choice(np.where(self.sprites[0:self.i_base, IDX_sid] == 1)[0])
         # Death and rebirth; increment global score and respawn
         if len(msg) > 10000:
             # TODO create a death animation / husk sprite.
@@ -425,6 +444,10 @@ class World(ParallelEnv):
         if int(self.sprites[i_victim, IDX_id]) == ID_ROCK:
             return
 
+        # Non-target flag — no effect
+        if int(self.sprites[i_victim, IDX_id]) == ID_FLAG:
+            return
+
         # Only animals can spear further
         if self.sprites[i, IDX_id] != ID_ANIMAL:
             return
@@ -434,13 +457,13 @@ class World(ParallelEnv):
             self.sprites[i, IDX_health] += BITE_SIZE
             self.sprites[i_victim, IDX_health] -= BITE_SIZE
             # this means, create plant splatter 
-            self.sprites[i_victim, IDX_damage] += 100
+            self.sprites[i_victim, IDX_damage] += 100 
         elif id_victim == ID_ANIMAL:
             self.sprites[i_victim, IDX_health] -= BITE_SIZE
             # this means, create bug splatter 
             self.sprites[i_victim, IDX_damage] += 100
-        elif id_victim == ID_FLAG:
-            pass
+        #elif id_victim == ID_FLAG:
+        #    pass
         else:
             print("[World]._resolve_combat ---- unexpected victim id:", id_victim)
 
@@ -458,7 +481,7 @@ class World(ParallelEnv):
     def _next_flag(self, i):
         ''' Target next flag.
 
-            Assume the i-th sprite has just touched its current flag (the i_flag-th sprite, of order o_flag). 
+            Assume the i-th sprite has just touched its current flag (the i_target-th sprite, of order o_flag). 
             We want to go to the next flag, which has the order o_flag+1. Except !
 
             Returns
@@ -467,9 +490,9 @@ class World(ParallelEnv):
             The index of the next flag. 
         '''
         # Index of flagged object for i-th sprite
-        i_flag = int(self.sprites[i,IDX_tid])
+        i_target = int(self.sprites[i,IDX_tid])
         # The 'order' of that flag 
-        o_flag = self.sprites[i_flag,IDX_sid]
+        o_flag = self.sprites[i_target,IDX_sid]
         # The final flag 
         o_last = max(self.sprites[:,IDX_sid]) 
         # Start afresh if this is the last one
@@ -568,7 +591,8 @@ class World(ParallelEnv):
         dist_between_rings = OUTER_RADIUS - rad
         for idx in neighbors:
             i_other = self._valid_rows[idx]
-            if i_other == i or self.sprites[i_other, IDX_id] <= 0:
+            if i_other == i or self.sprites[i_other, IDX_id] == ID_FLAG:
+                # ignore flags, cannot bump into them
                 continue
             op = self.sprites[i_other, IDX_pos]
             dx = float(pos[0]) - float(op[0])
@@ -585,7 +609,8 @@ class World(ParallelEnv):
         dist_between_rings = OUTER_RADIUS - rad
         for idx in neighbors:
             i_other = self._valid_rows[idx]
-            if i_other == i or self.sprites[i_other, IDX_id] <= 0:
+            if i_other == i or self.sprites[i_other, IDX_id] == ID_FLAG:
+                # ignore flags -- cannot sense them
                 continue
             op = self.sprites[i_other, IDX_pos]
             dx = float(pos[0]) - float(op[0])
@@ -598,24 +623,24 @@ class World(ParallelEnv):
                     self.sprites[i, IDX_COLIDE] = 1
 
     def _point_hit_from(self, p, neighbors):
-        """ What sprite does point p collide with?
+        """ What does point p collide with?
 
             Returns the sprite row index, or None if p hits terrain or nothing.
         """
+        # Check terrain collision
         j, k = self.pos2grid(p)
         if self.terrain[j, k] >= 1:
             return None
+        # Check neighbour collision (assume neighbours are rock, plant or animal).
         for idx in neighbors:
             i_other = self._valid_rows[idx]
-            sid = self.sprites[i_other, IDX_id]
-            if sid == 0 or sid == ID_FX:
-                continue
             op = self.sprites[i_other, IDX_pos]
             dx = float(p[0]) - float(op[0])
             dy = float(p[1]) - float(op[1])
             r = float(self.sprites[i_other, IDX_rad]) + 1
             if dx*dx + dy*dy < r*r:
                 return i_other
+        # Nothing ...
         return None
 
     def _pixel_from(self, p, neighbor_idxs):
@@ -625,7 +650,8 @@ class World(ParallelEnv):
             return id2rgb[ID_ROCK]
         for idx in neighbor_idxs:
             i_other = self._valid_rows[idx]
-            if self.sprites[i_other, IDX_id] <= 0:
+            if self.sprites[i_other, IDX_id] == ID_FLAG:
+                # ignore flags -- cannot sense them
                 continue
             op = self.sprites[i_other, IDX_pos]
             dx = float(p[0]) - float(op[0])
@@ -652,30 +678,16 @@ class World(ParallelEnv):
             i_victim : int
                 sprite id (animate or inaninmate)
         '''
-        # Bugs hurt themselves crashing into anything of positive id
-        
-        if self.sprites[i_victim,IDX_id] >= ID_VOID:   
-            # Bumps into something
-            self.sprites[i,IDX_health] -= BUMP_SIZE * abs(self.sprites[i,IDX_speed])
-            self.sprites[i,IDX_damage] += 100
+        # Bugs hurt themselves crashing into anything 
+        self.sprites[i,IDX_health] -= BUMP_SIZE * abs(self.sprites[i,IDX_speed])
+        self.sprites[i,IDX_damage] += 100
 
-        #elif i_victim == self.sprites[i,IDX_tid]:   
-        #    # Runs over the flag
-        #    self.sprites[i,IDX_RWD] += RWD_CHECKPOINT
-        #    self.sprites[i,IDX_tid] = self._next_flag(i)
-        else:
-            # FUTURE: Could have some terrain-effect here (when bug is over a certain tile),
-            #         e.g., speed reduction, some kind of healing, ...
-            return
-
-        # Other bugs can be victims too
-
+        # They also hurt what/whoever they are crashing into
         if self.sprites[i_victim,IDX_id] == ID_ANIMAL:
             self.sprites[i_victim,IDX_health] -= BUMP_SIZE # * abs(self.sprites[i_victim,IDX_speed])
             self.sprites[i_victim,IDX_damage] += 100
 
-        # The attacker slides off the victim
-
+        # Whatever it is, the attacker slides off the victim
         self.sprites[i,IDX_pos] += slide_off(self.sprites[i,IDX_pos],self.sprites[i,IDX_speed],self.sprites[i_victim,IDX_pos])
 
 

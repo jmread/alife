@@ -12,7 +12,7 @@ np.set_printoptions(threshold=np.inf, precision=1)
 import pygame
 
 from .graphics import N_array, COLOR_WHITE, get_label
-from .graphics import build_image_bank, build_bg_png as build_map, build_image_png, ID_ROCK, ID_PLANT, ID_ANIMAL, ID_FLAG, f_array
+from .graphics import build_image_bank, build_bg_png as build_map, build_image_png, ID_ROCK, ID_PLANT, ID_ANIMAL, ID_FLAG
 from .constants import IDX_id, IDX_x, IDX_y, IDX_pos, IDX_rad, IDX_img, IDX_sid
 from .config import MAP_DIR, MAP_ROWS, MAP_COLS, DEFAULT_MAP_NAME
 from .map_generator import generate_map
@@ -25,7 +25,8 @@ HELP_LINES = [
     "Click     Select object",
     "r         Add rock",
     "p         Add plant",
-    "d         Add decor (flag/nest)",
+    "d         Add decor (aesthetics)",
+    "f         Add nest (spawnpoint) or flag (waypoint)",
     "m         Move selected to cursor",
     "DEL       Delete selected",
     "UP/DOWN   Resize selected",
@@ -144,7 +145,6 @@ def editor_interface(world_info):
     images = [None for _ in range(100)]
 
     for i, sprite in enumerate(sprites): 
-        print(sprite)
         images[i] = build_image_png(sprite[IDX_pos],sprite[IDX_rad],sprite[IDX_id],sprite[IDX_img])[1]
         screen.blit(images[i], sprite[IDX_pos] - sprite[IDX_rad])
 
@@ -189,10 +189,16 @@ def editor_interface(world_info):
                     sprite = np.array([ID_PLANT, pos[0], pos[1], 20, int(np.random.choice(N_array[ID_PLANT])), -1])
                     sprites = np.vstack([sprites, sprite])
                     images[len(sprites)-1] = build_image_png(sprite[IDX_pos],sprite[IDX_rad],sprite[IDX_id],sprite[IDX_img])[1]
+                if event.key == pygame.K_f: 
+                    # Nest/flag
+                    pos = pygame.mouse.get_pos()
+                    sprite = np.array([ID_FLAG, pos[0], pos[1], 20, int(np.random.choice(6)), -1])
+                    sprites = np.vstack([sprites, sprite])
+                    images[len(sprites)-1] = build_image_png(sprite[IDX_pos],sprite[IDX_rad],sprite[IDX_id],sprite[IDX_img])[1]
                 if event.key == pygame.K_d: 
                     # Decor
                     pos = pygame.mouse.get_pos()
-                    sprite = np.array([ID_FLAG, pos[0], pos[1], 20, int(np.random.choice(N_array[ID_FLAG])), -1])
+                    sprite = np.array([ID_FLAG, pos[0], pos[1], 20, int(np.random.choice(N_array[ID_FLAG]-6)+6), -1])
                     sprites = np.vstack([sprites, sprite])
                     images[len(sprites)-1] = build_image_png(sprite[IDX_pos],sprite[IDX_rad],sprite[IDX_id],sprite[IDX_img])[1]
                 if event.key == pygame.K_g:

@@ -6,26 +6,23 @@ from PIL import Image, ImageDraw, ImageFont
 from .config import IMG_DIR
  
 # Types of Sprites/Things/Objects
-ID_FLAG = -1  # A flag/nest is something which has no physical presence (i.e., not directly visible or collidable to sprites) but is drawn, and some game logic may be associated.
-ID_VOID = 0   # Not anything; a colorless objects (not visible to bugs) nor any game logic associated with it; at most a placeholder.
-ID_ROCK = 1   # Blue objects
+ID_FX = -3    # Effects/decor are purely for visual satisfaction/aesthetics - no game logic is associated.
+ID_FLAG = -1  # A flag/nest is not visible or collidable to sprites, but some game logic may be associated (e.g., touching a flag, respawn at nest).
+ID_VOID = 0   # Not anything; a placeholder for an empty slot in the sprites array.
+ID_ROCK = 1   # Blue objects 
 ID_PLANT = 2  # Green objects
-ID_ANIMAL = 3 # Red objects
-ID_FX = -3   # Visual effect sprite (splatter/glitter) -- render only, invisible to simulation
-
-ID_GRASS = 666 # For future use
-ID_ORE = 777 # For future use
+ID_ANIMAL = 3 # Red objects (agent-controlled)
 
 # How many types of image are there for each .. 
 # TODO Discover dynamically 
-N_ROCKS = 15
+N_ROCKS = 16
 N_TREES = 47
 N_BUGS = 7
-N_FLAGS = 4
+N_FLAGS = 11
 
 # File names, e.g., rock_00.png ... rock_0d.png where d = N_ROCKS-1
+N_array = [ID_VOID,N_ROCKS,N_TREES,N_BUGS,N_FLAGS]
 f_array = [None,'rock','tree','bug','flag']
-N_array = [0,N_ROCKS,N_TREES,N_BUGS,N_FLAGS]
 
 # Basic colors
 COLOR_TRANSPARENT = (1,2,3)
@@ -34,34 +31,35 @@ COLOR_RED  = (255, 0, 0)
 COLOR_BLACK  = (0, 0, 0)
 COLOR_YELLOW  = (255, 255, 0)
 
-# Palletes of colors for 'splatter' artwork
-PAL_ANIMAL = [ (255,0,0), (178,0,0), (91,0,0), (250,50,50), (204,61,61), ]
-PAL_PLANT = [ (37, 82, 59),  (53, 136, 86), (90, 171, 97), (98, 189, 105), (48, 105, 75),  (12, 56, 35) ]
-PAL_ROCK = [(45,44,44), (58,50,50), (73,60,60), (92,73,73), (101,83,83),]
-PAL_FLAG = [(255, 215, 0),(207, 181, 59),(255, 201, 14),(255, 248, 200),(255, 215, 100)]
-
-# Convert ID number to splatter color
+# Convert ID to splatter palletes (for 'splatter' artwork)
 id2pal = {
             ID_VOID : [COLOR_WHITE],
-            ID_ROCK : PAL_ROCK,
-            ID_PLANT : PAL_PLANT,
-            ID_ANIMAL : PAL_ANIMAL,
-            ID_FLAG : PAL_FLAG,
+            ID_ROCK : [(45,44,44), (58,50,50), (73,60,60), (92,73,73), (101,83,83),],
+            ID_PLANT : [ (37, 82, 59),  (53, 136, 86), (90, 171, 97), (98, 189, 105), (48, 105, 75),  (12, 56, 35) ],
+            ID_ANIMAL : [ (255,0,0), (178,0,0), (91,0,0), (250,50,50), (204,61,61), ],
+            ID_FLAG : [(255, 215, 0),(207, 181, 59),(255, 201, 14),(255, 248, 200),(255, 215, 100)],
         }
 
-# Convert (ID) number to RGB intensities 
-id2rgb = np.array([
-    COLOR_BLACK, # VOID     =  0  = BLACK
-    [0.,0.,1.],  # ROCK     =  1  = WHITE
-    [0.,1.,0.],  # PLANT    =  3  = GREEN
-    [1.,0.,0.],  # ANIMAL   =  4  = BLUE
-    [0.,0.,0.],  # FLAG     = -2  = 
-    ])
+# Convert ID to RGB intensities (how agents observe each of these) 
+id2rgb = {
+        ID_VOID : COLOR_BLACK, # VOID     =  0  = BLACK
+        ID_ROCK : [0.,0.,1.],  # ROCK     =  1  = BLUE
+        ID_PLANT : [0.,1.,0.],  # PLANT    =  3  = GREEN
+        ID_ANIMAL : [1.,0.,0.],  # ANIMAL   =  4  = RED
+}
+
+# Convert ID to Z-index 
+id2z_idx = {
+        ID_VOID : 0,
+        ID_ROCK : 1,
+        ID_PLANT : 2,
+        ID_ANIMAL : 1,
+}
 
 # Import index constants (etc).
 from .constants import *
 
-def build_splatter_img(pos,rad,ID):
+def build_splatter_img(ID,pos,rad,qty,orad=None):
     '''
         Draw some splatter around pos, with radius rad, color according to ID.
     '''
@@ -69,8 +67,10 @@ def build_splatter_img(pos,rad,ID):
     image.fill(COLOR_TRANSPARENT)
     image.set_colorkey(COLOR_TRANSPARENT)
     palette = id2pal[ID]
-    color = palette[np.random.choice(len(palette))]
-    pygame.draw.circle(image, color, [int(np.random.randn() * rad * 0.5 + rad),int(np.random.randn() * rad * 0.5 + rad)],np.random.choice(3)+1)
+    orad = rad*2
+    for _ in range(qty):
+        color = palette[np.random.choice(len(palette))]
+        pygame.draw.circle(image, color, [int(np.random.randn() * rad * 0.5 + rad),int(np.random.randn() * rad * 0.5 + rad)],np.random.choice(3)+1)
     rect=image.get_rect(center=pos)
     return rect, image
 
@@ -175,7 +175,8 @@ def build_image_png(pos,rad,ID,SSID=-1):
     image_path = os.path.join(IMG_DIR, f"{f_array[ID]}_{SSID:02d}.png")
     image = pygame.image.load(image_path).convert_alpha()
 
-    # TODO Respect original image size as max size
+    # TODO if rad not specified -- use natural radius
+    # TODO Respect original image size as max size 
 
     # Scale the image to fit the size of the sprite
     if rad is not None:
@@ -291,7 +292,7 @@ def draw_state(screen, sprites, images, names):
     for i in range(n):
 
         # Spawn splatter FX from damage marker
-        if sprites[i, IDX_damage] > 0 and sprites[i, IDX_id] != ID_FX:
+        if sprites[i, IDX_damage] > 0:
             j = _find_free_fx(sprites, n)
             if j is not None:
                 src_id = int(sprites[i, IDX_id])
@@ -303,11 +304,11 @@ def draw_state(screen, sprites, images, names):
                 sprites[j, IDX_health] = timer
                 sprites[j, IDX_rad] = timer + 5
                 sprites[j, IDX_img] = src_id
-                images[j] = build_splatter_img(pos, timer + 5, src_id)[1]
+                images[j] = build_splatter_img(src_id, pos, int(sprites[i, IDX_id]), 20)[1]
             sprites[i, IDX_damage] = 0
 
         # Spawn glitter FX from glitter marker
-        if sprites[i, IDX_glitter] > 0 and sprites[i, IDX_id] != ID_FX:
+        if sprites[i, IDX_glitter] > 0:
             j = _find_free_fx(sprites, n)
             if j is not None:
                 pos = sprites[i, IDX_pos].astype(int)
@@ -318,10 +319,10 @@ def draw_state(screen, sprites, images, names):
                 sprites[j, IDX_health] = timer
                 sprites[j, IDX_rad] = timer + 5
                 sprites[j, IDX_img] = ID_FLAG
-                images[j] = build_splatter_img(pos, timer + 5, ID_FLAG)[1]
+                images[j] = build_splatter_img(ID_FLAG, pos, int(sprites[i, IDX_id]), 20)[1]
             sprites[i, IDX_glitter] = 0
 
-        if sprites[i,IDX_id] == 0:
+        if sprites[i,IDX_id] == ID_VOID:
             continue
         if sprites[i,IDX_id] == ID_ANIMAL:
             if images[i] is None: 
@@ -385,7 +386,7 @@ def draw_bug(screen, sprites, images, names, i, p=None):
     pygame.draw.circle(screen, np.array([255,255,255]) * sprite[IDX_PROXIMITY], p, OUTER_RADIUS, 3)
     #pygame.draw.circle(screen, COLOR_WHITE, p, OUTER_RADIUS, 3)
     # .. far outer
-    if sprite[IDX_FLAG] > 0.5:
+    if sprite[IDX_COMPASS] > 0.5:
         pygame.draw.circle(screen, COLOR_YELLOW, p, OUTER_RADIUS+4, 1)
 
     # Health/Calories/Energy level

@@ -75,6 +75,74 @@ def pad(matrix, padding=0):
 def trim(M):
     return M[1:-1,1:-1]
 
+
+def generate_grass_patch(size=128, alpha=180, density=0.5, seed=None, output_path=None):
+    '''
+    Generate a grass patch PNG with random tufts over a transparent background.
+
+    The result has soft, faded edges (radial falloff + noise) so it blends
+    naturally when placed on top of the sandy land tiles.
+
+    Parameters
+    ----------
+
+    size : int
+        Patch dimensions in pixels (square).
+    alpha : int (0-255)
+        Maximum opacity of grass pixels. Lower = more of the underlying
+        terrain shows through.
+    density : float (0-1)
+        How much of the patch area is covered by grass.  Higher = thicker.
+    seed : int or None
+        Random seed for reproducible patterns.
+    output_path : str / Path / None
+        Destination PNG.  If None, saves to IMG_DIR/grass_patch.png.
+
+    Returns
+    -------
+
+    Path to the saved PNG.
+    '''
+    import os
+    from PIL import Image, ImageFilter
+    from .config import IMG_DIR
+
+    rng = np.random.default_rng(seed)
+
+    # Random noise -> organic blobs
+    noise = rng.random((size, size))
+    noise_img = Image.fromarray((noise * 255).astype(np.uint8))
+    noise_img = noise_img.filter(ImageFilter.GaussianBlur(radius=size / 6))
+    noise = np.array(noise_img, dtype=float) / 255
+    noise = (noise - noise.min()) / (noise.max() - noise.min() + 1e-9)
+
+    # Radial falloff: full at centre, transparent at edges (smoothstep)
+    yy, xx = np.mgrid[0:size, 0:size]
+    dist = np.sqrt((xx - size / 2) ** 2 + (yy - size / 2) ** 2) / (size * 0.5)
+    falloff = np.clip(1 - dist, 0, 1)
+    falloff = falloff * falloff * (3 - 2 * falloff)
+
+    # Combine noise + falloff, keep top `density` fraction (relative threshold)
+    mask = noise * falloff
+    thresh = np.quantile(mask, 1 - density)
+    mask = np.clip((mask - thresh) / (mask.max() - thresh + 1e-9), 0, 1)
+
+    # Grass colour: sample from grass.png, add slight variation
+    grass_src = Image.open(os.path.join(IMG_DIR, 'grass.png')).convert('RGB').resize((size, size))
+    grass_rgb = np.array(grass_src, dtype=np.int16)
+    variation = rng.integers(-12, 12, (size, size, 1))
+    grass_rgb = np.clip(grass_rgb + variation, 0, 255).astype(np.uint8)
+
+    # Assemble RGBA
+    rgba = np.dstack([grass_rgb, (mask * alpha).astype(np.uint8)])
+    img = Image.fromarray(rgba, 'RGBA')
+
+    if output_path is None:
+        output_path = os.path.join(IMG_DIR, 'grass_patch.png')
+
+    img.save(output_path)
+    return output_path
+
 '''
 use this code to modify the tileset
 '''
@@ -119,4 +187,26 @@ use this code to modify the tileset
 #tileset3.show() 
 #rile = tile.rotate(180)
 #---------
+
+
+if __name__ == "__main__":
+    import argparse
+
+    p = argparse.ArgumentParser(description="Generate grass patch PNGs.")
+    p.add_argument("-n", "--count", type=int, default=5, help="number of patches to generate")
+    p.add_argument("--size", type=int, default=128, help="patch size in pixels")
+    p.add_argument("--alpha", type=int, default=180, help="max opacity (0-255)")
+    p.add_argument("--density", type=float, default=0.5, help="grass coverage (0-1)")
+    args = p.parse_args()
+
+    import os
+    from .config import IMG_DIR
+
+    for i in range(args.count):
+        name = f"grass_patch_{i:02d}.png"
+        path = generate_grass_patch(
+            size=args.size, alpha=args.alpha, density=args.density,
+            seed=i, output_path=os.path.join(IMG_DIR, name),
+        )
+        print("Generated %s" % path)
 
