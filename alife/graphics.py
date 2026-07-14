@@ -59,20 +59,29 @@ id2z_idx = {
 # Import index constants (etc).
 from .constants import *
 
-def build_splatter_img(ID,pos,rad,qty,orad=None):
+def build_splatter_img(ID, rad, qty, orad=None):
     '''
-        Draw some splatter around pos, with radius rad, color according to ID.
+        Build a pixel-spray splatter graphic centered in the returned image.
+        Spray fills the ring between rad and orad (default 2*rad), colored by ID.
+        The caller is responsible for blitting so the image centre sits on the
+        damaged sprite's centre.
     '''
-    image = pygame.Surface((rad*2, rad*2))
+    if orad is None:
+        orad = rad * 3
+    size = int(orad * 2)
+    center = size // 2
+    image = pygame.Surface((size, size))
     image.fill(COLOR_TRANSPARENT)
     image.set_colorkey(COLOR_TRANSPARENT)
     palette = id2pal[ID]
-    orad = rad*2
     for _ in range(qty):
         color = palette[np.random.choice(len(palette))]
-        pygame.draw.circle(image, color, [int(np.random.randn() * rad * 0.5 + rad),int(np.random.randn() * rad * 0.5 + rad)],np.random.choice(3)+1)
-    rect=image.get_rect(center=pos)
-    return rect, image
+        angle = np.random.uniform(0, 2 * np.pi)
+        r = rad + (orad - rad) * np.random.rand() ** 2
+        px = int(center + np.cos(angle) * r)
+        py = int(center + np.sin(angle) * r)
+        pygame.draw.circle(image, color, (px, py), np.random.choice(3) + 1)
+    return image
 
 def rotate_img(image, angle):
     ''' Rotate an image (keeping center and size) '''
@@ -304,7 +313,7 @@ def draw_state(screen, sprites, images, names):
                 sprites[j, IDX_health] = timer
                 sprites[j, IDX_rad] = timer + 5
                 sprites[j, IDX_img] = src_id
-                images[j] = build_splatter_img(src_id, pos, int(sprites[i, IDX_id]), 20)[1]
+                images[j] = build_splatter_img(src_id, int(sprites[i, IDX_rad]), 15)
             sprites[i, IDX_damage] = 0
 
         # Spawn glitter FX from glitter marker
@@ -319,7 +328,7 @@ def draw_state(screen, sprites, images, names):
                 sprites[j, IDX_health] = timer
                 sprites[j, IDX_rad] = timer + 5
                 sprites[j, IDX_img] = ID_FLAG
-                images[j] = build_splatter_img(ID_FLAG, pos, int(sprites[i, IDX_id]), 20)[1]
+                images[j] = build_splatter_img(ID_FLAG, int(sprites[i, IDX_rad]), 50)
             sprites[i, IDX_glitter] = 0
 
         if sprites[i,IDX_id] == ID_VOID:
@@ -335,9 +344,8 @@ def draw_state(screen, sprites, images, names):
         elif sprites[i,IDX_id] == ID_FX:
             # Draw splatter/glitter image, countdown timer, expire
             p = sprites[i, IDX_pos].astype(int)
-            r = int(sprites[i, IDX_rad])
             if images[i] is not None:
-                screen.blit(images[i], (p[0] - r, p[1] - r))
+                screen.blit(images[i], images[i].get_rect(center=p))
             sprites[i, IDX_health] -= 1
             if sprites[i, IDX_health] <= 0:
                 sprites[i, :] = 0
