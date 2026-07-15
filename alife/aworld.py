@@ -229,7 +229,8 @@ class World(ParallelEnv):
         for i in self.active_agents:
             neighbors = self._tree.query_ball_point(self.sprites[i, IDX_pos], query_r)
             # Check for instant death (inside of cliffs/water)
-            self._resolve_terrain(i)
+            if self._resolve_terrain(i):
+                continue
             # Check for collisions
             self._resolve_body(i, neighbors)
             # Check for spearing
@@ -570,7 +571,11 @@ class World(ParallelEnv):
         """ Phase 1: On-wall = instant death. """
         j, k = self.pos2grid(self.sprites[i, IDX_pos])
         if self.terrain[j, k] >= 1:
-            self.respawn(i, RWD_DEATH, msg="terrain death")
+            # Splatter at the death location before respawn teleports the sprite
+            self.sprites[i,IDX_health] = -1000
+            self.sprites[i,IDX_damage] += 100
+            return True
+        return False
 
     def _sense_terrain(self, i):
         """ Phase 2: Sense proximity to walls via precomputed distance field. """
