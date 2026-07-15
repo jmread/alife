@@ -8,11 +8,11 @@ Close the window or press Escape to quit.
 """
 
 from alife import World
+import sys
 
-
-def main():
+def main(options={'map_name' : "new_4"}):
     env = World(render_mode="human")
-    observations, infos = env.reset(seed=42, options={'map_name' : "new_4"})
+    observations, infos = env.reset(seed=42, options=options)
 
     # Test agents
     env.add_agent('agent_0')
@@ -32,4 +32,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    options = {'map_name' : "new_4"}
+    if len(sys.argv) >= 2:
+        options = {'map_name' : sys.argv[1]}
+    main(options)
