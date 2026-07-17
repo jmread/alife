@@ -217,8 +217,7 @@ class World(ParallelEnv):
         self.sprites[self.active_agents, IDX_RWD] = 0
 
         # Apply actions and move sprites according to dynamics
-        for i in self.active_agents:
-            self.enact(self.sprites[i], actions[i])
+        self.enact_all(actions)
 
         # Build spatial index of all sprite positions (statics + agents)
         self._valid_rows = list(range(self.i_base)) + self.active_agents
@@ -504,6 +503,67 @@ class World(ParallelEnv):
         # Selection
         selection = np.where(self.sprites[0:self.i_base, IDX_sid] == o_flag)[0]
         return int(np.random.choice(selection))
+
+    def enact_all(self, actions):
+        ''' Carry out actions for ALL active sprites in one vectorised pass.
+
+            Drop-in replacement for the per-sprite loop:
+                for i in self.active_agents:
+                    self.enact(self.sprites[i], actions[i])
+        '''
+        MAX_SPEED = 10
+        TURN_SPEED = 0.10
+        ACCEL = 0.2
+        BRAKE_DECEL = 0.8
+
+        agents = np.asarray(self.active_agents)
+        if len(agents) == 0:
+            return
+        rows = self.sprites[agents].copy()
+
+        # Stack actions into (n,2): col 0 = R (IDX_RANGLE), col 1 = L (IDX_LANGLE)
+        acts = np.array([actions[int(a)] for a in agents])
+        rows[:, IDX_RANGLE] = acts[:, 0]
+        rows[:, IDX_LANGLE] = acts[:, 1]
+
+        R = acts[:, 0]
+        L = acts[:, 1]
+        power = L * 0.5 + R * 0.5
+        target_speed = power * MAX_SPEED
+        turn_delta = (R - L) * TURN_SPEED
+
+        # Vectorised rotation of unit vectors
+        uv = rows[:, IDX_unitv]
+        c = np.cos(turn_delta)
+        s = np.sin(turn_delta)
+        rx = c * uv[:, 0] - s * uv[:, 1]
+        ry = s * uv[:, 0] + c * uv[:, 1]
+        norm = np.sqrt(rx * rx + ry * ry)
+        norm = np.where(norm == 0.0, 1.0, norm)
+        new_uv = np.column_stack([rx / norm, ry / norm])
+        rows[:, IDX_unitv] = new_uv
+
+        # Recompute spear & antennae from new unit vectors
+        base = new_uv * rows[:, IDX_rad][:, None]
+        rows[:, IDX_spear0] = base * SPEAR_RATIO
+        scaled = base * ANTENNA_RATIO
+        c1, s1 = np.cos(0.3), np.sin(0.3)
+        rows[:, IDX_anten1] = np.column_stack([c1 * scaled[:, 0] - s1 * scaled[:, 1],
+                                                s1 * scaled[:, 0] + c1 * scaled[:, 1]])
+        c2, s2 = np.cos(-0.3), np.sin(-0.3)
+        rows[:, IDX_anten2] = np.column_stack([c2 * scaled[:, 0] - s2 * scaled[:, 1],
+                                                s2 * scaled[:, 0] + c2 * scaled[:, 1]])
+
+        # Smooth acceleration (vectorised branches)
+        speed = rows[:, IDX_speed]
+        diff = speed - target_speed
+        new_speed = np.where(np.abs(diff) < ACCEL, target_speed,
+                    np.where(diff < 0, speed + ACCEL, speed - BRAKE_DECEL))
+        rows[:, IDX_speed] = np.clip(new_speed, 0.0, MAX_SPEED)
+        rows[:, IDX_SPEED] = rows[:, IDX_speed] / MAX_SPEED
+        rows[:, IDX_pos] += rows[:, IDX_unitv] * rows[:, IDX_speed][:, None]
+
+        self.sprites[agents] = rows
 
     def enact(self, sprite, actions):
         ''' Carry out actions for this sprite.
