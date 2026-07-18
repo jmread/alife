@@ -14,11 +14,14 @@ import pygame
 from .graphics import N_array, COLOR_WHITE, get_label
 from .graphics import build_image_bank, build_bg_png as build_map, build_image_png, ID_ROCK, ID_PLANT, ID_ANIMAL, ID_FLAG
 from .constants import IDX_id, IDX_x, IDX_y, IDX_pos, IDX_rad, IDX_img, IDX_sid
-from .config import MAP_DIR, MAP_ROWS, MAP_COLS, DEFAULT_MAP_NAME
+from .config import MAP_DIR, DEFAULT_MAP_NAME
 from .map_generator import generate_map
 from pathlib import Path
 
 GRID_SIZE = 64              # tile size (width and height, in pixels)
+
+MAP_ROWS = 12               # number of tiles N.B. must be even and > 4
+MAP_COLS = 8                # number of tiles N.B. must be even and > 4
 
 HELP_LINES = [
     "h         Toggle this help",
