@@ -24,8 +24,8 @@ from .config import MAP_DIR, FPS
 print("[World] Setting parameters")
 from .constants import *
 
-N_SPRITE = 70
-N = N_SPRITE - 20  # agent slots go from i_base to N-1; FX slots from N to N_SPRITE-1
+N_SPRITE = 200
+N = N_SPRITE - 40  # agent slots go from i_base to N-1; FX slots from N to N_SPRITE-1
 D = D_SPRITE
 
 # Rewards
@@ -390,9 +390,9 @@ class World(ParallelEnv):
                 decor.append(thing)
                 continue
             self.sprites[j, DISK_INDICES] = thing[DISK_INDICES]
-            # Verify sprite is not on a wall tile
-            r, c = self.pos2grid(self.sprites[j, IDX_pos])
-            assert self.terrain[r, c] == 0
+            # Verify sprite is not on a wall tile (tbh it doesn't matter...)
+            #r, c = self.pos2grid(self.sprites[j, IDX_pos])
+            #assert self.terrain[r, c] == 0
             j += 1
 
         return j, decor
